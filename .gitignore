@@ -2,3 +2,17 @@
 *.autosave
 build-*
 .ipynb_checkpoints
+build/CMakeCache.txt
+.gitignore
+build/.cmake/api/v1/query/client-vscode/query.json
+build/CMakeFiles/cmake.check_cache
+build/CMakeFiles/CMakeConfigureLog.yaml
+build/CMakeFiles/3.28.1/CMakeCCompiler.cmake
+build/CMakeFiles/3.28.1/CMakeCXXCompiler.cmake
+build/CMakeFiles/3.28.1/CMakeDetermineCompilerABI_C.bin
+build/CMakeFiles/3.28.1/CMakeDetermineCompilerABI_CXX.bin
+build/CMakeFiles/3.28.1/CMakeSystem.cmake
+build/CMakeFiles/3.28.1/CompilerIdC/a.out
+build/CMakeFiles/3.28.1/CompilerIdC/CMakeCCompilerId.c
+build/CMakeFiles/3.28.1/CompilerIdCXX/a.out
+build/CMakeFiles/3.28.1/CompilerIdCXX/CMakeCXXCompilerId.cpp
