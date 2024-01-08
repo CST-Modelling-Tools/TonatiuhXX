@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<Package>
-    <DisplayName>Application</DisplayName>
-    <Version>0.1.9</Version>
-    <Description>Ray tracing for solar energy</Description>
-    <ReleaseDate>2021-02-01</ReleaseDate>
-    <Default>true</Default>
-    <Script>script.qs</Script>
-</Package>

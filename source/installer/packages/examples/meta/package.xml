@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<Package>
-    <DisplayName>Examples</DisplayName>
-    <Version>0.1.9</Version>
-    <Description>Useful examples</Description>
-    <ReleaseDate>2021-02-01</ReleaseDate>
-    <Default>true</Default>
-    <Script>script.qs</Script>
-</Package>
