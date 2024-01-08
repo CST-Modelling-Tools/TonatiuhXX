@@ -34,6 +34,6 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
 # Add subdirectories
-add_subdirectory(source/libraries)
-add_subdirectory(source/kernel)
-add_subdirectory(source/application)
+add_subdirectory(libraries)
+add_subdirectory(kernel)
+add_subdirectory(application)
