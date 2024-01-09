@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/" >
+        <file>ShapeHyperbolic.png</file>
+    </qresource>
+</RCC>
