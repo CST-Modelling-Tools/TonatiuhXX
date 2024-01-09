@@ -2,8 +2,11 @@ cmake_minimum_required(VERSION 3.28)
 project(TonatiuhApplication VERSION 0.1.8.16)
 
 # Set the C++ standard
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+# Set the path to the desired Qt version
+set(Qt6_DIR "/opt/homebrew/Cellar/qt6/6.1.1/lib/cmake/Qt6")
 
 # Find Qt6 components
 find_package(Qt6 COMPONENTS Concurrent Qml PrintSupport Gui Network REQUIRED)
@@ -13,6 +16,8 @@ add_definitions(-DAPP_VERSION="0.1.8.16")
 
 # Include paths
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../libraries)
 
 # Source files
 # Insert your source files list here
@@ -176,7 +181,8 @@ set(FORMS
     widgets/NetworkConnectionsDialog.ui
     widgets/SunDialog.ui
 )
-qt6_wrap_ui(UI_HEADERS ${FORMS})
+
+#qt6_wrap_ui(UI_HEADERS ${FORMS})
 
 # Resources
 # Insert your resources here
@@ -185,12 +191,18 @@ set(RESOURCES
 )
 qt6_add_resources(RESOURCE_ADDED ${RESOURCES})
 
+set(COIN3D_LIBRARY /usr/local/lib/libCoin.dylib)
+set(SOQT_LIBRARY /usr/local/lib/libSoQt.dylib)
+
 # Executable
 add_executable(TonatiuhApplication ${SOURCES} ${HEADERS} ${UI_HEADERS} ${RESOURCE_ADDED})
 
 # Link libraries
-target_link_libraries(TonatiuhApplication Qt6::Concurrent Qt6::Qml Qt6::PrintSupport Qt6::Gui Qt6::Network)
-target_link_libraries(TonatiuhApplication TonatiuhKernel TonatiuhLibraries)
+target_link_libraries(TonatiuhApplication PRIVATE ${COIN3D_LIBRARY})
+target_link_libraries(TonatiuhApplication PRIVATE ${SOQT_LIBRARY})
+target_link_libraries(TonatiuhApplication PRIVATE Qt6::Concurrent Qt6::Qml Qt6::PrintSupport Qt6::Gui Qt6::Network)
+target_link_libraries(TonatiuhApplication PRIVATE TonatiuhLibraries TonatiuhKernel)
+
 
 # Platform-specific configurations
 if(WIN32)

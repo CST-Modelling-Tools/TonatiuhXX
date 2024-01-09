@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.28)
 project(TonatiuhLibraries)
 
 # Set the C++ standard
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Set the path to the desired Qt version
@@ -91,16 +91,19 @@ set(SOURCES
 )
 
 # UI files
-set(FORMS Coin3D/ContainerViewerMFVec2.ui)
+#set(FORMS Coin3D/ContainerViewerMFVec2.ui)
 
-set(UI_OUTPUT_DIR ${CMAKE_BINARY_DIR}/generated_ui)
+#set(UI_OUTPUT_DIR ${CMAKE_BINARY_DIR}/generated_ui)
 
-file(MAKE_DIRECTORY ${UI_OUTPUT_DIR})
+#file(MAKE_DIRECTORY ${UI_OUTPUT_DIR})
 
-qt6_wrap_ui(UI_HEADERS ${FORMS} WORKING_DIRECTORY ${UI_OUTPUT_DIR})
+#qt6_wrap_ui(UI_HEADERS ${FORMS} WORKING_DIRECTORY ${UI_OUTPUT_DIR})
 
 # Create the library
-add_library(TonatiuhLibraries STATIC ${SOURCES} ${HEADERS} ${UI_HEADERS})
+add_library(TonatiuhLibraries SHARED ${SOURCES} ${HEADERS} ${UI_HEADERS})
+
+set(COIN3D_LIBRARY /usr/local/lib/libCoin.dylib)
 
 # Link libraries
-target_link_libraries(TonatiuhLibraries Qt6::PrintSupport)
+target_link_libraries(TonatiuhLibraries PRIVATE ${COIN3D_LIBRARY})
+target_link_libraries(TonatiuhLibraries PRIVATE Qt6::PrintSupport)

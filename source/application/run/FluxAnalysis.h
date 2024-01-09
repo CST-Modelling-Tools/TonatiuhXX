@@ -38,7 +38,7 @@ public:
     PhotonsBuffer* getPhotonsBuffer() {return m_photons;}
 
 signals:
-    stopSignal();
+    void stopSignal();
 
 private slots:
     void processEvents();
