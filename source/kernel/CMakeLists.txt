@@ -1,23 +1,14 @@
 cmake_minimum_required(VERSION 3.28)
-project(TonatiuhKernel)
+set(ProjectName TonatiuhKernel)
+
+project(${ProjectName})
 
 # Set the C++ standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# Set the path to the desired Qt version
-set(Qt6_DIR "/opt/homebrew/Cellar/qt6/6.1.1/lib/cmake/Qt6")
-
 # Find the required Qt components
 find_package(Qt6 COMPONENTS Core Gui Widgets REQUIRED)
-
-# Add definitions
-add_definitions(-DTONATIUH_KERNEL_EXPORT)
-
-# Include directories
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../libraries)
 
 # Header files
 set(HEADERS 
@@ -172,18 +163,16 @@ set(SOURCES
 set(RESOURCES resources.qrc)
 
 # Create the library
-add_library(TonatiuhKernel SHARED ${SOURCES} ${HEADERS} ${RESOURCES})
+add_library(${ProjectName} SHARED ${SOURCES} ${HEADERS} ${RESOURCES})
 
-set(COIN3D_LIBRARY /usr/local/lib/libCoin.dylib)
-set(SOQT_LIBRARY /usr/local/lib/libSoQt.dylib)
+# Target-specific include directories
+target_include_directories(${ProjectName} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMAKE_CURRENT_SOURCE_DIR}/../libraries)
 
-# Link libraries
-target_link_libraries(TonatiuhKernel PRIVATE ${COIN3D_LIBRARY})
-target_link_libraries(TonatiuhKernel PRIVATE ${SOQT_LIBRARY})
-target_link_libraries(TonatiuhKernel PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets)
-target_link_libraries(TonatiuhKernel PRIVATE TonatiuhLibraries)
-
+target_link_libraries(${ProjectName} PRIVATE ${COIN3D_LIBRARY} ${SOQT_LIBRARY} Qt6::Core Qt6::Gui Qt6::Widgets TonatiuhLibraries)
 
 if(WIN32)
-    target_link_libraries(TonatiuhKernel opengl32)
+    target_link_libraries(${ProjectName} opengl32)
 endif()
+
+# Add compile definitions if necessary
+target_compile_definitions(${ProjectName} PRIVATE TONATIUH_KERNEL_EXPORT)

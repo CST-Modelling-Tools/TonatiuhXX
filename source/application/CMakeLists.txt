@@ -1,26 +1,85 @@
 cmake_minimum_required(VERSION 3.28)
-project(TonatiuhApplication VERSION 0.1.8.16)
+set(ProjectName Tonatiuh++)
+
+project(${ProjectName} VERSION 0.1.8.16)
 
 # Set the C++ standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# Set the path to the desired Qt version
-set(Qt6_DIR "/opt/homebrew/Cellar/qt6/6.1.1/lib/cmake/Qt6")
-
 # Find Qt6 components
 find_package(Qt6 COMPONENTS Concurrent Qml PrintSupport Gui Network REQUIRED)
 
-# Definitions
-add_definitions(-DAPP_VERSION="0.1.8.16")
-
-# Include paths
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../libraries)
+# Header files
+set(HEADERS
+    calculator/CelestialWidget.h
+    calculator/HorizontalWidget.h
+    calculator/Image.h
+    calculator/SunCalculatorDialog.h
+    calculator/WorldMap.h
+    commands/ActionInsert.h
+    commands/CmdCopy.h
+    commands/CmdCut.h
+    commands/CmdDelete.h
+    commands/CmdInsertNode.h
+    commands/CmdPaste.h
+    commands/CmdRename.h
+    commands/CmdSetFieldNode.h
+    commands/CmdSetFieldText.h
+    main/CustomSplashScreen.h
+    main/Document.h
+    main/LineEditPlaceHolder.h
+    main/MainWindow.h
+    main/PluginManager.h
+    main/UndoView.h
+    parameters/ComboBoxDelegate.h
+    parameters/ParametersDelegate.h
+    parameters/ParametersEditor.h
+    parameters/ParametersItemField.h
+    parameters/ParametersItemNode.h
+    parameters/ParametersModel.h
+    parameters/ParametersTabs.h
+    parameters/ParametersView.h
+    run/FluxAnalysis.h
+    run/FluxAnalysisDialog.h
+    run/RayTracingDialog.h
+    run/SelectSurfaceDialog.h
+    script/AboutScriptDialog.h
+    script/CodeEditor.h
+    script/DataObject.h
+    script/LineNumbers.h
+    script/NodeObject.h
+    script/ScriptRayTracer.h
+    script/ScriptWindow.h
+    script/SyntaxHighlighter.h
+    script/tonatiuh_script.h
+    tree/SceneDelegate.h
+    tree/SceneFilter.h
+    tree/SceneTreeModel.h
+    tree/SceneTreeView.h
+    tree/SoPathVariant.h
+    updater/FileDownloader.h
+    updater/UpdateDialog.h
+    updater/UpdateReader.h
+    view/GraphicRoot.h
+    view/GraphicView.h
+    view/GridNode3D.h
+    view/KeyFilter.h
+    view/KeyboardHook.h
+    view/MenuStyle.h
+    view/OverlayNode.h
+    view/SeparatorStyle.h
+    view/SkyNode3D.h
+    view/SunNode3D.h
+    view/trf.h
+    widgets/AboutDialog.h
+    widgets/AirDialog.h
+    widgets/HelpDialog.h
+    widgets/NetworkConnectionsDialog.h
+    widgets/SunDialog.h
+)
 
 # Source files
-# Insert your source files list here
 set(SOURCES
     calculator/CelestialWidget.cpp
     calculator/CelestialWidget.cpp
@@ -91,78 +150,7 @@ set(SOURCES
     widgets/SunDialog.cpp
 )
 
-# Header files
-# Insert your header files list here
-set(HEADERS
-    calculator/CelestialWidget.h
-    calculator/HorizontalWidget.h
-    calculator/Image.h
-    calculator/SunCalculatorDialog.h
-    calculator/WorldMap.h
-    commands/ActionInsert.h
-    commands/CmdCopy.h
-    commands/CmdCut.h
-    commands/CmdDelete.h
-    commands/CmdInsertNode.h
-    commands/CmdPaste.h
-    commands/CmdRename.h
-    commands/CmdSetFieldNode.h
-    commands/CmdSetFieldText.h
-    main/CustomSplashScreen.h
-    main/Document.h
-    main/LineEditPlaceHolder.h
-    main/MainWindow.h
-    main/PluginManager.h
-    main/UndoView.h
-    parameters/ComboBoxDelegate.h
-    parameters/ParametersDelegate.h
-    parameters/ParametersEditor.h
-    parameters/ParametersItemField.h
-    parameters/ParametersItemNode.h
-    parameters/ParametersModel.h
-    parameters/ParametersTabs.h
-    parameters/ParametersView.h
-    run/FluxAnalysis.h
-    run/FluxAnalysisDialog.h
-    run/RayTracingDialog.h
-    run/SelectSurfaceDialog.h
-    script/AboutScriptDialog.h
-    script/CodeEditor.h
-    script/DataObject.h
-    script/LineNumbers.h
-    script/NodeObject.h
-    script/ScriptRayTracer.h
-    script/ScriptWindow.h
-    script/SyntaxHighlighter.h
-    script/tonatiuh_script.h
-    tree/SceneDelegate.h
-    tree/SceneFilter.h
-    tree/SceneTreeModel.h
-    tree/SceneTreeView.h
-    tree/SoPathVariant.h
-    updater/FileDownloader.h
-    updater/UpdateDialog.h
-    updater/UpdateReader.h
-    view/GraphicRoot.h
-    view/GraphicView.h
-    view/GridNode3D.h
-    view/KeyFilter.h
-    view/KeyboardHook.h
-    view/MenuStyle.h
-    view/OverlayNode.h
-    view/SeparatorStyle.h
-    view/SkyNode3D.h
-    view/SunNode3D.h
-    view/trf.h
-    widgets/AboutDialog.h
-    widgets/AirDialog.h
-    widgets/HelpDialog.h
-    widgets/NetworkConnectionsDialog.h
-    widgets/SunDialog.h
-)
-
 # UI files
-# Insert your UI files list here
 set(FORMS
     calculator/SunCalculatorDialog.ui
     run/FluxAnalysisDialog.ui
@@ -182,32 +170,25 @@ set(FORMS
     widgets/SunDialog.ui
 )
 
-#qt6_wrap_ui(UI_HEADERS ${FORMS})
-
 # Resources
-# Insert your resources here
-set(RESOURCES
-    resources.qrc
-)
+set(RESOURCES resources.qrc)
+
 qt6_add_resources(RESOURCE_ADDED ${RESOURCES})
 
-set(COIN3D_LIBRARY /usr/local/lib/libCoin.dylib)
-set(SOQT_LIBRARY /usr/local/lib/libSoQt.dylib)
+# Create the Executable
+add_executable(${ProjectName} ${SOURCES} ${HEADERS} ${UI_HEADERS} ${RESOURCE_ADDED})
 
-# Executable
-add_executable(TonatiuhApplication ${SOURCES} ${HEADERS} ${UI_HEADERS} ${RESOURCE_ADDED})
+# Target-specific include directories
+target_include_directories(${ProjectName} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMAKE_CURRENT_SOURCE_DIR}/../libraries)
+
+# Target-specific compile definitions
+target_compile_definitions(${ProjectName} PRIVATE APP_VERSION="0.1.8.16")
 
 # Link libraries
-target_link_libraries(TonatiuhApplication PRIVATE ${COIN3D_LIBRARY})
-target_link_libraries(TonatiuhApplication PRIVATE ${SOQT_LIBRARY})
-target_link_libraries(TonatiuhApplication PRIVATE Qt6::Concurrent Qt6::Qml Qt6::PrintSupport Qt6::Gui Qt6::Network)
-target_link_libraries(TonatiuhApplication PRIVATE TonatiuhLibraries TonatiuhKernel)
-
+target_link_libraries(${ProjectName} PRIVATE ${COIN3D_LIBRARY} ${SOQT_LIBRARY} Qt6::Concurrent Qt6::Qml Qt6::PrintSupport Qt6::Gui Qt6::Network TonatiuhLibraries TonatiuhKernel)
 
 # Platform-specific configurations
 if(WIN32)
-    target_link_libraries(TonatiuhApplication opengl32)
-    # Add RC_ICONS handling here if needed
+    target_link_libraries(${ProjectName} PRIVATE opengl32)
+    # Additional Windows-specific configurations
 endif()
-
-# Additional configurations and target properties can be set here
