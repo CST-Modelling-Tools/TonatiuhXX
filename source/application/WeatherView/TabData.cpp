@@ -78,7 +78,7 @@ void TabData::on_pushButton_Reset_clicked()
     m_plotter->resetPlot();
 }
 
-#include "SunPathLib/math/math.h"
+#include "SunPath/math/math.h"
 
 void TabData::mouseWheelCP(QWheelEvent* event)
 {

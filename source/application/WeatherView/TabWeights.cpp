@@ -65,11 +65,11 @@ void TabWeights::setModelTMY(ModelTMY* model)
     m_modelData = model;
 }
 
-#include "SunPathLib/calculators/SunCalculatorMB.h"
-#include "SunPathLib/samplers/SunSpatial.h"
-#include "SunPathLib/samplers/SunTemporal.h"
-#include "SunPathLib/data/FormatTMY.h"
-#include "SunPathLib/data/FormatWSN.h"
+#include "SunPath/calculators/SunCalculatorMB.h"
+#include "SunPath/samplers/SunSpatial.h"
+#include "SunPath/samplers/SunTemporal.h"
+#include "SunPath/data/FormatTMY.h"
+#include "SunPath/data/FormatWSN.h"
 using namespace sp;
 
 #include "TMY/ModelTMY.h"

@@ -192,3 +192,9 @@ if(WIN32)
     target_link_libraries(${ProjectName} PRIVATE opengl32)
     # Additional Windows-specific configurations
 endif()
+
+# Post-build command to run install
+# add_custom_command(TARGET ${ProjectName} POST_BUILD
+#    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target install
+#    COMMENT "Running post-build installation step"
+#)

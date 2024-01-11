@@ -92,4 +92,4 @@ target_include_directories(${ProjectName} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${
 target_link_libraries(${ProjectName} PRIVATE ${COIN3D_LIBRARY} Qt6::PrintSupport)
 
 # Add compile definitions if necessary
-target_compile_definitions(${ProjectName} PRIVATE TONATIUH_LIBRARIES_EXPORT SUNPATHLIB_EXPORT)
+target_compile_definitions(${ProjectName} PRIVATE TONATIUH_LIBRARIES_EXPORT SunPath_EXPORT)

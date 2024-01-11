@@ -6,7 +6,6 @@ const double LongIntegerToDouble = 1./4294967296.;
 
 class RandomMersenneTwister: public Random
 {
-
 public:
     RandomMersenneTwister(ulong seedValue = 5489UL, ulong randomNumberArraySize = 10'000'000);
     RandomMersenneTwister(const ulong* seedArray, int seedArraySize, ulong randomNumberArraySize = 10'000'000);
@@ -75,9 +74,6 @@ inline double RandomMersenneTwister::Random01()
 {
     return (double(RandomInteger()) + 0.5)*LongIntegerToDouble;   // divided by 2^32
 }
-
-
-
 
 class RandomMersenneTwisterFactory:
     public QObject, public RandomFactoryT<RandomMersenneTwister>

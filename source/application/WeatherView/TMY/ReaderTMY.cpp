@@ -4,7 +4,7 @@
 #include <QStringList>
 
 #include "ParameterItem.h"
-#include "SunPathLib/calculators/SunCalculatorMB.h"
+#include "SunPath/calculators/SunCalculatorMB.h"
 #include "../DaysEdit/DaysModel.h"
 
 using Qt::endl;

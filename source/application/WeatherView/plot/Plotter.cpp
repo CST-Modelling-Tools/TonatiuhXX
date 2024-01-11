@@ -113,7 +113,7 @@ void Plotter::resetPlot()
 // add axis tag
 // add second axis
 // https://www.qcustomplot.com/index.php/tutorials/specialcases/axistags
-#include "SunPathLib/calculators/SunCalculatorMB.h"
+#include "SunPath/calculators/SunCalculatorMB.h"
 void Plotter::addSun(bool on)
 {
     if (!on) {

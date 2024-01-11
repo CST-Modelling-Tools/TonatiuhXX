@@ -2,7 +2,7 @@
 
 #include <QRegularExpression>
 
-#include "SunPathLib/math/math.h" // for degree
+#include "SunPath/math/math.h" // for degree
 
 
 ParameterAbstract::ParameterAbstract(const QString& name, const QString& text, bool editable):

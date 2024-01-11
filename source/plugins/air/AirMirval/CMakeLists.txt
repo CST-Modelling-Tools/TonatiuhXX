@@ -1,28 +1,11 @@
 cmake_minimum_required(VERSION 3.28)
-project(AirMirval)
+set(ProjectName AirMirval)
+
+project(${ProjectName})
 
 # Set the C++ standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-
-# Set the path to the desired Qt version
-set(Qt6_DIR "/opt/homebrew/Cellar/qt6/6.1.1/lib/cmake/Qt6")
-
-# Find the required Qt components
-find_package(Qt6 COMPONENTS Core Gui Widgets REQUIRED)
-
-# Add definitions
-add_definitions(-DTONATIUH_KERNEL_EXPORT)
-
-# Include Coin3D headers
-include_directories(/usr/local/include)
-include_directories(/usr/local/include/Inventor)
-
-# Include directories
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../libraries)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../kernel)
 
 #Header files
 set(HEADERS
@@ -33,18 +16,37 @@ set(HEADERS
 set(SOURCES 
     AirMirval.cpp
 )
+
 # Resource files, if any
 set(RESOURCES resources.qrc)
 
 # Add the plugin as a library
-add_library(AirMirval SHARED ${HEADERS} ${SOURCES} ${RESOURCES})
+add_library(${ProjectName} SHARED ${HEADERS} ${SOURCES} ${RESOURCES})
 
-set(COIN3D_LIBRARY /usr/local/lib/libCoin.dylib)
-set(SOQT_LIBRARY /usr/local/lib/libSoQt.dylib)
+# Specify include directories for this target
+target_include_directories(${ProjectName} PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR} 
+    ${CMAKE_CURRENT_SOURCE_DIR}/.. 
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../libraries 
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../kernel
+)
+
+# Add compile definitions
+target_compile_definitions(${ProjectName} PRIVATE TONATIUH_KERNEL_EXPORT)
 
 # Link libraries
-target_link_libraries(AirMirval PRIVATE ${COIN3D_LIBRARY})
-# target_link_libraries(AirMirval PRIVATE ${SOQT_LIBRARY})
-target_link_libraries(AirMirval PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets)
-# target_link_libraries(AirMirval PRIVATE TonatiuhLibraries)
-target_link_libraries(AirMirval PRIVATE TonatiuhKernel)
+target_link_libraries(${ProjectName} PRIVATE 
+    Qt6::Core 
+    Qt6::Gui 
+    Qt6::Widgets 
+    TonatiuhKernel
+    # Assuming COIN3D_LIBRARY and SOQT_LIBRARY are set in the top-level CMakeLists.txt
+    ${COIN3D_LIBRARY}
+    ${SOQT_LIBRARY}
+)
+
+# Specify the installation rules
+#install(TARGETS ${ProjectName} 
+#    LIBRARY DESTINATION "${CMAKE_INSTALL_PREFIX}/bin/plugins/air"
+#    RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}/bin/plugins/air"
+#)
