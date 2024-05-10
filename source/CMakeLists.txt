@@ -12,23 +12,40 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-if(APPLE)
-    # Select the Qt6 version we want to use
-    set(Qt6_DIR "/opt/homebrew/Cellar/qt6/6.1.1/lib/cmake/Qt6")
-    
-    # Include Coin3D and Eigen headers (specific to macOS)
-    include_directories(/usr/local/include)
-    include_directories(/usr/local/include/Inventor)
-    include_directories(/usr/local/include/eigen3/)
+# Global compiler options
+if(CMAKE_COMPILER_IS_GNUCXX)
+    add_compile_options(-Wno-deprecated-declarations -Wno-attributes)
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        add_compile_options(-O3)
+    endif()
+endif()
 
-    # Link directories for macOS
-    link_directories(/usr/local/lib)    
+# Platform-specific configurations
+if(APPLE)
+    # macOS specific settings
+    set(Qt6_DIR "/opt/homebrew/Cellar/qt6/6.1.1/lib/cmake/Qt6")
+    include_directories(
+      /usr/local/include 
+      /usr/local/include/Inventor
+      /usr/local/include/eigen3/)
+    link_directories(/usr/local/lib)
+    set(COIN3D_LIBRARY /usr/local/lib/libCoin.dylib)
+    set(SOQT_LIBRARY /usr/local/lib/libSoQt.dylib)
+    add_compile_definitions(COIN_NOT_DLL SOQT_NOT_DLL)
 elseif(WIN32)
-    # Set the Qt6 path for Windows if needed
+    # Windows specific settings
     # set(Qt6_DIR "path/to/qt6/on/windows")
-elseif(UNIX AND NOT APPLE) # Linux
-    # Set the Qt6 path for Linux if needed
+    # include_directories(paths for Windows)
+    # link_directories(paths for Windows)
+    # set(COIN3D_LIBRARY path for Windows)
+    # set(SOQT_LIBRARY path for Windows)
+elseif(UNIX)
+    # Linux specific settings
     # set(Qt6_DIR "path/to/qt6/on/linux")
+    # include_directories(paths for Linux)
+    # link_directories(paths for Linux)
+    # set(COIN3D_LIBRARY path for Linux)
+    # set(SOQT_LIBRARY path for Linux)
 endif()
 
 # Find the Qt6 package
@@ -39,30 +56,9 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-# Global compiler options
-if(CMAKE_COMPILER_IS_GNUCXX)
-    add_compile_options(-Wno-deprecated-declarations -Wno-attributes)
-    if(CMAKE_BUILD_TYPE STREQUAL "Release")
-        add_compile_options(-O3)
-    endif()
-    # Add definitions for Coin3D on MacOS
-    if(APPLE)
-        add_compile_definitions(COIN_NOT_DLL SOQT_NOT_DLL)
-    endif()
-endif()
-
-# Speficying the path of the Coin3D and SoQt libraries
-if(APPLE)
-    set(COIN3D_LIBRARY /usr/local/lib/libCoin.dylib)
-    set(SOQT_LIBRARY /usr/local/lib/libSoQt.dylib)
-elseif(WIN32)
-    # Set paths for Windows
-elseif(UNIX AND NOT APPLE)
-    # Set paths for Linux
-endif()
-
 # Add subdirectories
 add_subdirectory(libraries)
 add_subdirectory(kernel)
+add_subdirectory(SunPath)
 add_subdirectory(application)
 add_subdirectory(plugins)

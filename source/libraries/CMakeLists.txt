@@ -89,7 +89,7 @@ add_library(${ProjectName} SHARED ${SOURCES} ${HEADERS} ${UI_HEADERS})
 target_include_directories(${ProjectName} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 # Link libraries
-target_link_libraries(${ProjectName} PRIVATE ${COIN3D_LIBRARY} Qt6::PrintSupport)
+target_link_libraries(${PROJECT_NAME} PRIVATE ${COIN3D_LIBRARY} Qt6::PrintSupport)
 
 # Add compile definitions if necessary
-target_compile_definitions(${ProjectName} PRIVATE TONATIUH_LIBRARIES_EXPORT SunPath_EXPORT)
+target_compile_definitions(${PROJECT_NAME} PRIVATE TONATIUH_LIBRARIES_EXPORT SunPath_EXPORT)

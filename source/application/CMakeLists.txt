@@ -173,10 +173,8 @@ set(FORMS
 # Resources
 set(RESOURCES resources.qrc)
 
-qt6_add_resources(RESOURCE_ADDED ${RESOURCES})
-
 # Create the Executable
-add_executable(${ProjectName} ${SOURCES} ${HEADERS} ${UI_HEADERS} ${RESOURCE_ADDED})
+add_executable(${ProjectName} ${SOURCES} ${HEADERS} ${FORMS} ${RESOURCES})
 
 # Target-specific include directories
 target_include_directories(${ProjectName} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMAKE_CURRENT_SOURCE_DIR}/../libraries)
