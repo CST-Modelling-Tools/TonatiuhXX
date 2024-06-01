@@ -202,6 +202,7 @@ void InstanceNode::collectShapeTransforms(QStringList disabledNodes, QVector<QPa
     }
 }
 
+/*
 QDataStream& operator<<(QDataStream& s, const InstanceNode& node)
 {
     s << node.getNode();
@@ -213,3 +214,4 @@ QDataStream& operator>>(QDataStream& s, const InstanceNode& node)
     s >> node;
     return s;
 }
+*/

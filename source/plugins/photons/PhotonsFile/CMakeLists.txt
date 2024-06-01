@@ -5,26 +5,12 @@ project(PhotonsFile)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# Set the path to the desired Qt version
-set(Qt6_DIR "/opt/homebrew/Cellar/qt6/6.1.1/lib/cmake/Qt6")
+# Assuming the necessary Qt and Coin3D libraries are found in the top-level CMakeLists.txt
 
-# Find the required Qt components
-find_package(Qt6 COMPONENTS Core Gui Widgets REQUIRED)
-
-# Add definitions
-add_definitions(-DTONATIUH_KERNEL_EXPORT)
-
-# Include Coin3D headers
-include_directories(/usr/local/include)
-include_directories(/usr/local/include/Inventor)
-
-# Include directories
+# Include directories, assuming relative paths will be inherited from top-level
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../libraries)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../kernel)
 
-#Header files
+# Header files
 set(HEADERS
     PhotonsFile.h
     PhotonsFileWidget.h
@@ -37,7 +23,6 @@ set(SOURCES
 )
 
 # UI files
-# Insert your UI files list here
 set(FORMS
     PhotonsFileWidget.ui
 )
@@ -46,14 +31,18 @@ set(FORMS
 set(RESOURCES resources.qrc)
 
 # Add the plugin as a library
-add_library(PhotonsFile SHARED ${HEADERS} ${SOURCES} ${RESOURCES})
+add_library(${PROJECT_NAME} SHARED ${HEADERS} ${SOURCES} ${RESOURCES} ${FORMS})
 
-set(COIN3D_LIBRARY /usr/local/lib/libCoin.dylib)
-set(SOQT_LIBRARY /usr/local/lib/libSoQt.dylib)
+# Link libraries using globally defined variables and target links
+target_link_libraries(${PROJECT_NAME} PRIVATE 
+    ${COIN3D_LIBRARY} 
+    ${SOQT_LIBRARY}
+    Qt6::Core 
+    Qt6::Gui 
+    Qt6::Widgets
+    TonatiuhLibraries
+    TonatiuhKernel
+)
 
-# Link libraries
-target_link_libraries(PhotonsFile PRIVATE ${COIN3D_LIBRARY})
-target_link_libraries(PhotonsFile PRIVATE ${SOQT_LIBRARY})
-target_link_libraries(PhotonsFile PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets)
-target_link_libraries(PhotonsFile PRIVATE TonatiuhLibraries)
-target_link_libraries(PhotonsFile PRIVATE TonatiuhKernel)
+# Find the required Qt components
+find_package(Qt6 COMPONENTS Core Gui Widgets REQUIRED)
