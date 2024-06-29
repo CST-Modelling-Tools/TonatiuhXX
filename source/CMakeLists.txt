@@ -32,13 +32,13 @@ if(APPLE)
     add_compile_definitions(COIN_NOT_DLL SOQT_NOT_DLL)
 elseif(WIN32)
     # Windows specific settings
-    set(Qt6_DIR "C:/Qt/6.5.2/6.5.2/msvc2019_64/lib/cmake/Qt6")
+    set(Qt6_DIR "C:/Qt/6.8.0/msvc2022_64/lib/cmake/Qt6")
     include_directories(
-        C:/Coin3D/include
-        C:/Coin3D/include/eigen-3.4.0)
-    link_directories(C:/Coin3D/lib)
-    set(COIN3D_LIBRARY C:/Coin3D/lib/Coin4.lib)
-    set(SOQT_LIBRARY C:/Coin3D/lib/SoQt1.lib)
+        C:/Coin3D4TonatiuhXX/include
+        C:/local/eigen)
+    link_directories(C:/Coin3D4TonatiuhXX/lib)
+    set(COIN3D_LIBRARY C:/Coin3D4TonatiuhXX/lib/Coin4.lib)
+    set(SOQT_LIBRARY C:/Coin3D4TonatiuhXX/lib/SoQt1.lib)
     add_definitions(-DSOQT_NOT_DLL -DCOIN3D_NOT_DLL)  # Assuming static linkage
 elseif(UNIX AND NOT APPLE)  # Linux specific settings
     # Adjust Qt path if necessary
