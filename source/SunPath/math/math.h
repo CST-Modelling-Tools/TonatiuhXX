@@ -1,9 +1,10 @@
+#define _USE_MATH_DEFINES
+#include <cmath>
+
 #pragma once
 
 #include "SunPath/SunPath.h"
 
-#include <cmath>
-#define _USE_MATH_DEFINES
 #include <limits>
 
 namespace sp {
