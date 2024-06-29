@@ -13,9 +13,9 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # Global compiler options
-add_compile_options(-Wno-deprecated-declarations -Wno-attributes)
 if(CMAKE_COMPILER_IS_GNUCXX AND CMAKE_BUILD_TYPE STREQUAL "Release")
-    add_compile_options(-O3)
+    add_compile_options(-O3)    
+    add_compile_options(-Wno-deprecated-declarations -Wno-attributes)
 endif()
 
 # Platform-specific configurations
