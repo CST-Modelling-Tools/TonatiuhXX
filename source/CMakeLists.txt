@@ -13,9 +13,9 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # Global compiler options
-add_compile_options(-Wno-deprecated-declarations -Wno-attributes)
 if(CMAKE_COMPILER_IS_GNUCXX AND CMAKE_BUILD_TYPE STREQUAL "Release")
-    add_compile_options(-O3)
+    add_compile_options(-O3)    
+    add_compile_options(-Wno-deprecated-declarations -Wno-attributes)
 endif()
 
 # Platform-specific configurations
@@ -32,13 +32,16 @@ if(APPLE)
     add_compile_definitions(COIN_NOT_DLL SOQT_NOT_DLL)
 elseif(WIN32)
     # Windows specific settings
-    # set(Qt6_DIR "path/to/qt6/on/windows")
-    # include_directories(paths for Windows)
-    # link_directories(paths for Windows)
-    # set(COIN3D_LIBRARY path for Windows)
-    # set(SOQT_LIBRARY path for Windows)
+    set(Qt6_DIR "C:/Qt/6.8.0/msvc2022_64/lib/cmake/Qt6")
+    include_directories(
+        C:/Coin3D4TonatiuhXX/include
+        C:/local/eigen)
+    link_directories(C:/Coin3D4TonatiuhXX/lib)
+    set(COIN3D_LIBRARY C:/Coin3D4TonatiuhXX/lib/Coin4.lib)
+    set(SOQT_LIBRARY C:/Coin3D4TonatiuhXX/lib/SoQt1.lib)
+    add_definitions(-DSOQT_NOT_DLL -DCOIN3D_NOT_DLL)  # Assuming static linkage
 elseif(UNIX AND NOT APPLE)  # Linux specific settings
-# Adjust Qt path if necessary
+    # Adjust Qt path if necessary
     set(Qt6_DIR "/usr/lib/x86_64-linux-gnu/cmake/Qt6")
     include_directories(
     /usr/include
@@ -48,7 +51,7 @@ elseif(UNIX AND NOT APPLE)  # Linux specific settings
     set(COIN3D_LIBRARY libCoin.so)
     set(SOQT_LIBRARY libSoQt.so)
     # Define Linux specific preprocessor flags if needed
-endif()
+    endif()
 
 # Find the Qt6 package
 find_package(Qt6 COMPONENTS Core Gui Widgets PrintSupport REQUIRED)
