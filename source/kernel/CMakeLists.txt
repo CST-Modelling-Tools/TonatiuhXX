@@ -171,7 +171,7 @@ target_include_directories(${ProjectName} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${
 target_link_libraries(${ProjectName} PRIVATE ${COIN3D_LIBRARY} ${SOQT_LIBRARY} Qt6::Core Qt6::Gui Qt6::Widgets TonatiuhLibraries)
 
 if(WIN32)
-    target_link_libraries(${ProjectName} opengl32)
+    target_link_libraries(${ProjectName} PRIVATE opengl32)
 endif()
 
 # Add compile definitions if necessary
