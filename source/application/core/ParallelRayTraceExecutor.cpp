@@ -111,7 +111,8 @@ void writeTaskDiagnostic(const ParallelRayTraceOptions& options,
                          QMutex* diagnosticMutex,
                          const QString& event,
                          const RayTraceTask& task,
-                         int count)
+                         int count,
+                         ulong raysCompleted = 0)
 {
     if (!options.diagnosticOutput || count > 5)
         return;
@@ -122,8 +123,10 @@ void writeTaskDiagnostic(const ParallelRayTraceOptions& options,
         << ": count=" << count
         << ", index=" << task.index
         << ", rays=" << static_cast<qulonglong>(task.rays)
-        << ", active_threads=" << QThreadPool::globalInstance()->activeThreadCount()
-        << Qt::endl;
+        << ", active_threads=" << QThreadPool::globalInstance()->activeThreadCount();
+    if (raysCompleted > 0)
+        out << ", rays_completed=" << static_cast<qulonglong>(raysCompleted);
+    out << Qt::endl;
 }
 }
 
@@ -269,6 +272,19 @@ bool ParallelRayTraceExecutor::trace(TSceneKit* scene,
         writeTaskDiagnostic(options, &diagnosticMutex, "start", task, startedCount);
 
         const HitCallback taskHitCallback = taskHitCallbackFactory ? taskHitCallbackFactory(task.index) : hitCallback;
+        RayTracer::TraceCallback traceCallback;
+        if (options.diagnosticOutput && startedCount <= 5) {
+            traceCallback = [&, task, startedCount](const char* event, ulong raysCompleted) {
+                writeTaskDiagnostic(
+                    options,
+                    &diagnosticMutex,
+                    QString::fromLatin1(event),
+                    task,
+                    startedCount,
+                    raysCompleted
+                );
+            };
+        }
         RayTracer tracer(
             instanceLayout,
             &instanceSun,
@@ -281,8 +297,11 @@ bool ParallelRayTraceExecutor::trace(TSceneKit* scene,
             photonBuffer ? &mutexPhotonBuffer : nullptr,
             exportSurfaceList,
             &exportFailed,
-            taskHitCallback
+            taskHitCallback,
+            traceCallback
         );
+        writeTaskDiagnostic(options, &diagnosticMutex, "constructed", task, startedCount);
+        writeTaskDiagnostic(options, &diagnosticMutex, "operator_call", task, startedCount);
         tracer(task.rays);
         const int finishedCount = tasksFinished.fetch_add(1) + 1;
         writeTaskDiagnostic(options, &diagnosticMutex, "finish", task, finishedCount);

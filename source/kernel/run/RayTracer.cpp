@@ -10,6 +10,20 @@
 #include "air/AirTransmission.h"
 
 
+namespace
+{
+ulong nextTraceMilestone(ulong raysCompleted, ulong totalRays)
+{
+    if (raysCompleted < 1000 && totalRays >= 1000)
+        return 1000;
+    if (raysCompleted < 100000 && totalRays >= 100000)
+        return 100000;
+    if (raysCompleted < 1000000 && totalRays >= 1000000)
+        return 1000000;
+    return totalRays + 1;
+}
+}
+
 RayTracer::RayTracer(InstanceNode* instanceRoot,
     InstanceNode* instanceSun,
     SunAperture* sunAperture,
@@ -21,7 +35,8 @@ RayTracer::RayTracer(InstanceNode* instanceRoot,
     QMutex* mutexPhotons,
     QVector<InstanceNode*> exportSuraceList,
     std::atomic_bool* exportFailed,
-    HitCallback hitCallback
+    HitCallback hitCallback,
+    TraceCallback traceCallback
 ):
     m_instanceLayout(instanceRoot),
     m_instanceSun(instanceSun),
@@ -35,20 +50,35 @@ RayTracer::RayTracer(InstanceNode* instanceRoot,
     m_mutexPhotonsBuffer(mutexPhotons),
     m_exportFailed(exportFailed),
     m_hitCallback(hitCallback),
+    m_traceCallback(traceCallback),
     m_exportSurfaceList(exportSuraceList),
     m_sunCells(sunAperture->getCells())
-{   
+{
 
 }
 
 void RayTracer::operator()(ulong nRays)
 {
+    if (m_traceCallback)
+        m_traceCallback("operator_enter", 0);
+
     if (m_sunCells.empty()) return;
     if (m_exportFailed && m_exportFailed->load())
         return;
 
     RandomParallel rand(m_rand, m_mutexRand);
     const bool recordPhotons = m_photonBuffer && m_mutexPhotonsBuffer;
+    const bool traceDiagnostics = static_cast<bool>(m_traceCallback);
+    ulong nextDiagnosticRay = traceDiagnostics ? 1 : nRays + 1;
+    auto reportTraceProgress = [&](ulong raysCompleted) {
+        if (traceDiagnostics && raysCompleted == nextDiagnosticRay) {
+            m_traceCallback("rays_completed", raysCompleted);
+            nextDiagnosticRay = nextTraceMilestone(raysCompleted, nRays);
+        }
+    };
+
+    if (m_traceCallback)
+        m_traceCallback(recordPhotons ? "branch_photon_buffer" : "branch_no_photon_buffer", 0);
 
     if (!recordPhotons) {
         for (ulong n = 0; n < nRays; ++n) {
@@ -56,7 +86,11 @@ void RayTracer::operator()(ulong nRays)
                 return;
 
             Ray ray;
+            if (traceDiagnostics && n == 0)
+                m_traceCallback("first_ray_begin", 0);
             NewPrimitiveRay(&ray, rand);
+            if (traceDiagnostics && n == 0)
+                m_traceCallback("first_ray_generated", 0);
             bool isFront = true;
             int rayLength = 0;
             InstanceNode* intersectedSurface = nullptr;
@@ -86,6 +120,11 @@ void RayTracer::operator()(ulong nRays)
 
             if (m_hitCallback && intersectedSurface && ray.tMax != gcf::infinity)
                 m_hitCallback(RayTracerHit{ray.point(ray.tMax), intersectedSurface, isFront});
+
+            const ulong raysCompleted = n + 1;
+            if (traceDiagnostics && n == 0)
+                m_traceCallback("first_ray_traced", raysCompleted);
+            reportTraceProgress(raysCompleted);
         }
         return;
     }
@@ -104,7 +143,11 @@ void RayTracer::operator()(ulong nRays)
 
         // Part 1: first photon point (on sun surface)
         Ray ray;
+        if (traceDiagnostics && n == 0)
+            m_traceCallback("first_ray_begin", 0);
         NewPrimitiveRay(&ray, rand);
+        if (traceDiagnostics && n == 0)
+            m_traceCallback("first_ray_generated", 0);
         bool isFront = true;
         int rayLength = 0;
         InstanceNode* intersectedSurface = m_instanceSun;
@@ -141,8 +184,17 @@ void RayTracer::operator()(ulong nRays)
 
         // Part 3: last photon point (absorption in air)
         // skip rays without intersections
-        if (rayLength == 0 && ray.tMax == gcf::infinity) continue;
-        if (!bExportAll && !m_exportSurfaceList.contains(intersectedSurface)) continue;
+        const ulong raysCompleted = n + 1;
+        if (traceDiagnostics && n == 0)
+            m_traceCallback("first_ray_traced", raysCompleted);
+        if (rayLength == 0 && ray.tMax == gcf::infinity) {
+            reportTraceProgress(raysCompleted);
+            continue;
+        }
+        if (!bExportAll && !m_exportSurfaceList.contains(intersectedSurface)) {
+            reportTraceProgress(raysCompleted);
+            continue;
+        }
         // limit length of other rays
         if (ray.tMax == gcf::infinity) {// always true?
             ray.tMax = 1.;
@@ -151,6 +203,8 @@ void RayTracer::operator()(ulong nRays)
         if (m_hitCallback && intersectedSurface)
             m_hitCallback(RayTracerHit{ray.point(ray.tMax), intersectedSurface, isFront});
         photons.push_back(Photon(++rayLength, ray.point(ray.tMax), intersectedSurface, isFront));
+
+        reportTraceProgress(raysCompleted);
     }
 
     m_mutexPhotonsBuffer->lock();
