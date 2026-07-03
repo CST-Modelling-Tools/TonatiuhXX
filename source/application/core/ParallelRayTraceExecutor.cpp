@@ -10,6 +10,7 @@
 #include <QStringList>
 #include <QTextStream>
 #include <QThread>
+#include <QThreadPool>
 #include <QtConcurrentMap>
 
 #include "core/SceneInstanceBuilder.h"
@@ -99,9 +100,30 @@ void writeRayLoopDiagnostics(const ParallelRayTraceOptions& options,
     else
         out << "  requested_worker_count: not_set" << Qt::endl;
     out << "  ideal_thread_count: " << QThread::idealThreadCount() << Qt::endl;
+    out << "  thread_pool_max_thread_count: " << QThreadPool::globalInstance()->maxThreadCount() << Qt::endl;
+    out << "  thread_pool_active_thread_count: " << QThreadPool::globalInstance()->activeThreadCount() << Qt::endl;
     out << "  record_photons: " << (options.recordPhotons ? "true" : "false") << Qt::endl;
     out << "  photon_buffer_enabled: " << (photonBufferEnabled ? "true" : "false") << Qt::endl;
     out << "  hit_callback_enabled: " << (hitCallbackEnabled ? "true" : "false") << Qt::endl;
+}
+
+void writeTaskDiagnostic(const ParallelRayTraceOptions& options,
+                         QMutex* diagnosticMutex,
+                         const QString& event,
+                         const RayTraceTask& task,
+                         int count)
+{
+    if (!options.diagnosticOutput || count > 5)
+        return;
+
+    QMutexLocker lock(diagnosticMutex);
+    QTextStream out(stdout);
+    out << "ray_task_" << event
+        << ": count=" << count
+        << ", index=" << task.index
+        << ", rays=" << static_cast<qulonglong>(task.rays)
+        << ", active_threads=" << QThreadPool::globalInstance()->activeThreadCount()
+        << Qt::endl;
 }
 }
 
@@ -214,8 +236,11 @@ bool ParallelRayTraceExecutor::trace(TSceneKit* scene,
     QMutex mutexRandom;
     QMutex mutexPhotonBuffer;
     QMutex progressMutex;
+    QMutex diagnosticMutex;
     std::atomic_bool exportFailed(false);
     std::atomic<ulong> traced(0);
+    std::atomic<int> tasksStarted(0);
+    std::atomic<int> tasksFinished(0);
 
     const QVector<ulong> raysPerThread = guiRaysPerThread(options.rays);
     QVector<RayTraceTask> tasks = makeTasks(options.rays);
@@ -240,6 +265,9 @@ bool ParallelRayTraceExecutor::trace(TSceneKit* scene,
         if (exportFailed.load())
             return;
 
+        const int startedCount = tasksStarted.fetch_add(1) + 1;
+        writeTaskDiagnostic(options, &diagnosticMutex, "start", task, startedCount);
+
         const HitCallback taskHitCallback = taskHitCallbackFactory ? taskHitCallbackFactory(task.index) : hitCallback;
         RayTracer tracer(
             instanceLayout,
@@ -256,6 +284,8 @@ bool ParallelRayTraceExecutor::trace(TSceneKit* scene,
             taskHitCallback
         );
         tracer(task.rays);
+        const int finishedCount = tasksFinished.fetch_add(1) + 1;
+        writeTaskDiagnostic(options, &diagnosticMutex, "finish", task, finishedCount);
         if (exportFailed.load())
             return;
 
