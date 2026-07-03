@@ -10,10 +10,11 @@
 #include <QFileInfo>
 #include <QJSEngine>
 #include <QTextStream>
+#include <QThread>
 
 #include "benchmark/BenchmarkRunner.h"
 #include "core/CorePluginRegistry.h"
-#include "core/ParallelRayTraceExecutor.h"
+#include "core/RayTraceRunner.h"
 #include "core/SceneLoader.h"
 #include "core/TonatiuhCore.h"
 
@@ -67,7 +68,7 @@ bool readIntegerOption(const QJSValue& value, const QString& name, bool allowZer
     return true;
 }
 
-QJSValue makeTraceSummary(QJSEngine* engine, const QString& sceneFilePath, ulong rays, ulong seed, const ParallelRayTraceResult& result)
+QJSValue makeTraceSummary(QJSEngine* engine, const QString& sceneFilePath, ulong rays, ulong seed, const RayTraceResult& result)
 {
     QJSValue summary = engine->newObject();
     summary.setProperty("scene_file", QJSValue(sceneFilePath));
@@ -239,14 +240,16 @@ QJSValue HeadlessScriptApi::traceScene(const QJSValue& optionsValue)
         return QJSValue();
     }
 
-    ParallelRayTraceOptions options;
+    RayTraceOptions options;
     options.rays = rays;
     options.seed = seed;
-    options.recordPhotons = false;
+    options.workerCount = qMax(1, QThread::idealThreadCount());
+    options.chunkSize = 10000;
+    options.outputMode = RayTraceOutputMode::NoOutput;
 
-    ParallelRayTraceResult result;
-    ParallelRayTraceExecutor executor;
-    if (!executor.trace(scene.get(), options, &result, &errorMessage)) {
+    RayTraceResult result;
+    RayTraceRunner runner;
+    if (!runner.trace(scene.get(), options, &result, &errorMessage)) {
         recordError(QString("tn.traceScene failed for %1: %2").arg(absoluteFilePath(sceneFileName), errorMessage));
         return QJSValue();
     }

@@ -39,6 +39,9 @@ struct ParallelRayTraceResult
     bool exportFailed = false;
 };
 
+// Experimental/internal executor retained for source-level comparison with the
+// GUI QtConcurrent model. Release headless commands should route through
+// RayTraceRunner instead.
 class ParallelRayTraceExecutor
 {
 public:

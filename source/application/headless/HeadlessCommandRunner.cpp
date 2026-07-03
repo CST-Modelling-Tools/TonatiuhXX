@@ -5,10 +5,11 @@
 #include <QCoreApplication>
 #include <QFileInfo>
 #include <QTextStream>
+#include <QThread>
 
 #include "benchmark/BenchmarkRunner.h"
 #include "core/CorePluginRegistry.h"
-#include "core/ParallelRayTraceExecutor.h"
+#include "core/RayTraceRunner.h"
 #include "core/SceneLoader.h"
 #include "core/TonatiuhCore.h"
 #include "headless/HeadlessScriptHost.h"
@@ -94,14 +95,15 @@ int HeadlessCommandRunner::traceScene(const QStringList& args) const
     out << "photon_export: false" << Qt::endl;
     out << "export_path: none" << Qt::endl;
 
-    ParallelRayTraceOptions options;
+    RayTraceOptions options;
     options.rays = parsed.rays;
     options.seed = parsed.seed;
-    options.recordPhotons = false;
+    options.workerCount = qMax(1, QThread::idealThreadCount());
+    options.chunkSize = 10000;
 
-    ParallelRayTraceResult result;
-    ParallelRayTraceExecutor executor;
-    if (!executor.trace(scene.get(), options, &result, &errorMessage, [&out](const QString& message) {
+    RayTraceResult result;
+    RayTraceRunner runner;
+    if (!runner.trace(scene.get(), options, &result, &errorMessage, [&out](const QString& message) {
             out << message << Qt::endl;
         })) {
         err << "Trace failed: " << errorMessage << Qt::endl;

@@ -54,10 +54,9 @@ public:
     using HitCallback = std::function<void(const RayTracerHit&)>;
     using WorkerHitCallbackFactory = std::function<HitCallback(int)>;
 
-    // Experimental worker/chunk runner retained for internal comparison and
-    // possible future migration work. Release headless tracing uses
-    // ParallelRayTraceExecutor so it follows the GUI QtConcurrent/RayTracer
-    // execution model instead of this custom std::thread scheduler.
+    // Release headless tracing uses this worker/chunk runner so benchmark,
+    // trace-scene, and tn.traceScene preserve explicit worker_count/chunk_size
+    // scheduling and per-chunk deterministic RNG streams.
     bool trace(TSceneKit* scene,
                const RayTraceOptions& options,
                RayTraceResult* result,
