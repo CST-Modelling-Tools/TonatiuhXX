@@ -44,7 +44,7 @@ tn.traceScene({ scene, rays, seed, noExport: true })
 
 `tonatiuh` is also available as an alias for the same limited object. GUI-only APIs such as screenshot capture, scene-tree editing, dialogs, widget access, or GUI-compatible `MainWindow` methods are not available in headless scripts. Unknown or GUI-only API calls fail with a script error instead of being silently ignored.
 
-`tn.traceScene` uses the same QCoreApplication-compatible `RayTraceRunner` path as the headless `trace-scene` command. It supports deterministic no-export tracing only:
+`tn.traceScene` uses the same QCoreApplication-compatible `ParallelRayTraceExecutor` path as the headless `trace-scene` command. The executor preserves the GUI `MainWindow::Run()` parallel tracing model without creating GUI widgets. It supports no-export tracing only:
 
 - `scene`: required `.tnhpp` scene path
 - `rays`: required positive integer
@@ -144,14 +144,14 @@ Use the dataset scene, config, reference JSON, and flux-grid reference files whe
 
 ## Scheduling Fields
 
-`worker_count` and `chunk_size` are optional RayTraceRunner tuning fields.
+`worker_count` and `chunk_size` are retained for compatibility with benchmark configs written for the earlier worker/chunk runner. The GUI-equivalent executor now uses the same QtConcurrent scheduling model as `MainWindow::Run()`: 100 `raysPerThread` partitions plus one remainder partition when needed, one shared random stream behind `RandomParallel`, and the QtConcurrent global thread pool.
 
 | Field | Type | Default | Notes |
 | --- | --- | --- | --- |
-| `worker_count` | positive integer | `QThread::idealThreadCount()` | Effective value is written to result JSON as `worker_count`. |
-| `chunk_size` | positive integer | `10000` | Effective value is written to result JSON as `chunk_size`; `chunk_count` is also written. |
+| `worker_count` | positive integer | compatibility only | Parsed for older configs; the effective result field reports `QThread::idealThreadCount()`, matching the GUI progress dialog label. |
+| `chunk_size` | positive integer | compatibility only | Parsed for older configs; the effective result field reports the GUI `rays / 100` partition size, and `chunk_count` reports the number of GUI partitions. |
 
-The random stream is deterministic for a fixed scene, ray count, seed, worker strategy, and chunk size. Changing `chunk_size` changes deterministic chunk seeds, so `flux_grid_sha256` is expected to change.
+The headless trace path now intentionally follows GUI scheduling rather than the previous deterministic per-chunk seed strategy. Whole-run timing and `flux_grid_sha256` should be treated as validation artifacts for a specific executable and platform, not as a guarantee across different scheduling environments.
 
 ## Result Fields
 
@@ -160,8 +160,8 @@ Benchmark result JSON always includes the effective scheduling fields:
 ```json
 {
   "worker_count": 20,
-  "chunk_count": 1000,
-  "chunk_size": 10000
+  "chunk_count": 100,
+  "chunk_size": 5000000
 }
 ```
 

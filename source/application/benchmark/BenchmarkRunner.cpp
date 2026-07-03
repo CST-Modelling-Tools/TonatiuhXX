@@ -17,10 +17,9 @@
 #include <QSaveFile>
 #include <QStringList>
 #include <QTextStream>
-#include <QThread>
 #include <QtEndian>
 
-#include "core/RayTraceRunner.h"
+#include "core/ParallelRayTraceExecutor.h"
 #include "kernel/run/RayTracer.h"
 #include "libraries/math/gcf.h"
 
@@ -735,27 +734,28 @@ int BenchmarkRunner::run(const QString& configFileName, TSceneKit* scene, QStrin
     if (!fluxGridBinaryOutputFileName.isEmpty())
         out << "flux_grid_binary_output_file: " << fluxGridBinaryOutputFileName << Qt::endl;
 
-    RayTraceOptions options;
+    ParallelRayTraceOptions options;
     options.rays = config.rays;
     options.seed = config.seed;
-    options.sunWidthDivisions = 100;
-    options.sunHeightDivisions = 100;
-    options.workerCount = config.workerCount > 0 ? config.workerCount : qMax(1, QThread::idealThreadCount());
-    options.chunkSize = config.chunkSize > 0 ? config.chunkSize : 10000;
+    options.recordPhotons = false;
+    options.diagnosticOutput = true;
+    options.requestedWorkerCount = config.workerCount;
+    Q_UNUSED(config.chunkSize)
 
-    std::vector<BenchmarkAccumulator> workerAccumulators;
-    workerAccumulators.reserve(static_cast<size_t>(options.workerCount));
-    for (int worker = 0; worker < options.workerCount; ++worker)
-        workerAccumulators.emplace_back(config);
+    std::vector<BenchmarkAccumulator> taskAccumulators;
+    const qulonglong taskCount = ParallelRayTraceExecutor::taskCountForRays(config.rays);
+    taskAccumulators.reserve(static_cast<size_t>(taskCount));
+    for (qulonglong task = 0; task < taskCount; ++task)
+        taskAccumulators.emplace_back(config);
 
-    RayTraceResult traceResult;
-    RayTraceRunner runner;
+    ParallelRayTraceResult traceResult;
+    ParallelRayTraceExecutor executor;
     QString traceError;
-    if (!runner.trace(scene, options, &traceResult, &traceError, [&out](const QString& message) {
+    if (!executor.trace(scene, options, &traceResult, &traceError, [&out](const QString& message) {
             out << message << Qt::endl;
-        }, RayTraceRunner::HitCallback(), [&workerAccumulators](int workerIndex) {
-            return [&workerAccumulators, workerIndex](const RayTracerHit& hit) {
-                workerAccumulators[static_cast<size_t>(workerIndex)].onHit(hit);
+        }, ParallelRayTraceExecutor::HitCallback(), [&taskAccumulators](int taskIndex) {
+            return [&taskAccumulators, taskIndex](const RayTracerHit& hit) {
+                taskAccumulators[static_cast<size_t>(taskIndex)].onHit(hit);
             };
         })) {
         return fail(errorMessage, QString("Benchmark trace failed: %1").arg(traceError)), 1;
@@ -764,8 +764,8 @@ int BenchmarkRunner::run(const QString& configFileName, TSceneKit* scene, QStrin
         return fail(errorMessage, "Benchmark trace produced invalid power-per-ray."), 1;
 
     BenchmarkAccumulator accumulator(config);
-    for (const BenchmarkAccumulator& workerAccumulator : workerAccumulators)
-        accumulator.merge(workerAccumulator);
+    for (const BenchmarkAccumulator& taskAccumulator : taskAccumulators)
+        accumulator.merge(taskAccumulator);
 
     const BenchmarkMetrics metrics = accumulator.metrics(traceResult.powerPerRay);
     if (!std::isfinite(metrics.totalPowerMw) ||

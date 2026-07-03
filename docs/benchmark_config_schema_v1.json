@@ -30,13 +30,13 @@
     "worker_count": {
       "type": "integer",
       "minimum": 1,
-      "description": "Optional RayTraceRunner worker count. When omitted, Tonatiuh++ uses QThread::idealThreadCount()."
+      "description": "Compatibility field retained for older benchmark configs. The GUI-equivalent headless executor uses the QtConcurrent global thread pool and reports QThread::idealThreadCount() as the effective worker_count."
     },
     "chunk_size": {
       "type": "integer",
       "minimum": 1,
       "default": 10000,
-      "description": "Optional rays per worker chunk. Different chunk sizes use different deterministic chunk seeds, so flux_grid_sha256 is expected to change."
+      "description": "Compatibility field retained for older benchmark configs. The GUI-equivalent headless executor ignores this value and uses the GUI 100-part raysPerThread partition."
     },
     "target_side_id": {
       "type": "integer",

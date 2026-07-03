@@ -54,10 +54,10 @@ public:
     using HitCallback = std::function<void(const RayTracerHit&)>;
     using WorkerHitCallbackFactory = std::function<HitCallback(int)>;
 
-    // Migration boundary: GUI code still owns exporter startup, append/non-append
-    // buffer lifecycle, retained-photon safeguards, endExport(power), and ray
-    // display. RayTraceRunner only executes tracing against an already-prepared
-    // photon buffer when outputMode is PhotonBuffer.
+    // Experimental worker/chunk runner retained for internal comparison and
+    // possible future migration work. Release headless tracing uses
+    // ParallelRayTraceExecutor so it follows the GUI QtConcurrent/RayTracer
+    // execution model instead of this custom std::thread scheduler.
     bool trace(TSceneKit* scene,
                const RayTraceOptions& options,
                RayTraceResult* result,

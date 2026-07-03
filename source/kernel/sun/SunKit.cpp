@@ -123,6 +123,8 @@ void SunKit::setBox(Box3D box)
 
 void SunKit::setBox(TSceneKit* scene)
 {
+    if (!scene) return;
+
     TSeparatorKit* separatorKit = scene->getLayout();
     if (!separatorKit) return;
 
@@ -143,6 +145,8 @@ void SunKit::setBox(TSceneKit* scene)
 
 bool SunKit::findTexture(int sizeX, int sizeY, InstanceNode* instanceRoot)
 {
+    if (!instanceRoot) return false;
+
     SunAperture* aperture = static_cast<SunAperture*>(getPart("aperture", false));
     if (!aperture) return false;
 

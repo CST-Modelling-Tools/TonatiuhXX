@@ -131,6 +131,8 @@ void RayTracer::operator()(ulong nRays)
 
             // save intersection
             if (!isReflected) break;
+            if (m_hitCallback && intersectedSurface)
+                m_hitCallback(RayTracerHit{ray.point(ray.tMax), intersectedSurface, isFront});
             ++rayLength;
             if (bExportAll || m_exportSurfaceList.contains(intersectedSurface))
                 photons.push_back(Photon(rayLength, ray.point(ray.tMax), intersectedSurface, isFront, true));
@@ -146,6 +148,8 @@ void RayTracer::operator()(ulong nRays)
             ray.tMax = 1.;
             isFront = 0; // ? back for air
         }
+        if (m_hitCallback && intersectedSurface)
+            m_hitCallback(RayTracerHit{ray.point(ray.tMax), intersectedSurface, isFront});
         photons.push_back(Photon(++rayLength, ray.point(ray.tMax), intersectedSurface, isFront));
     }
 
