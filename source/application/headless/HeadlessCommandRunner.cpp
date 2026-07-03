@@ -13,6 +13,34 @@
 #include "core/TonatiuhCore.h"
 #include "headless/HeadlessScriptHost.h"
 
+namespace
+{
+class TextProgressReporter
+{
+public:
+    explicit TextProgressReporter(QTextStream* stream):
+        m_stream(stream)
+    {
+    }
+
+    void operator()(const QString& message) const
+    {
+        if (m_stream)
+            *m_stream << message << Qt::endl;
+    }
+
+private:
+    QTextStream* m_stream = nullptr;
+};
+
+bool failParse(QString* errorMessage, const QString& message)
+{
+    if (errorMessage)
+        *errorMessage = message;
+    return false;
+}
+}
+
 int HeadlessCommandRunner::run(const QStringList& arguments) const
 {
     QStringList args = arguments;
@@ -101,9 +129,7 @@ int HeadlessCommandRunner::traceScene(const QStringList& args) const
 
     ParallelRayTraceResult result;
     ParallelRayTraceExecutor executor;
-    if (!executor.trace(scene.get(), options, &result, &errorMessage, [&out](const QString& message) {
-            out << message << Qt::endl;
-        })) {
+    if (!executor.trace(scene.get(), options, &result, &errorMessage, TextProgressReporter(&out))) {
         err << "Trace failed: " << errorMessage << Qt::endl;
         return 1;
     }
@@ -172,55 +198,49 @@ bool HeadlessCommandRunner::parseTraceSceneArguments(const QStringList& args, Tr
     if (parsed)
         *parsed = TraceSceneArguments();
 
-    auto fail = [errorMessage](const QString& message) {
-        if (errorMessage)
-            *errorMessage = message;
-        return false;
-    };
-
     if (!parsed)
-        return fail("Internal argument parser error.");
+        return failParse(errorMessage, "Internal argument parser error.");
     if (args.isEmpty())
-        return fail("trace-scene requires a scene file path.");
+        return failParse(errorMessage, "trace-scene requires a scene file path.");
 
     parsed->sceneFileName = args[0];
     if (parsed->sceneFileName.startsWith("--"))
-        return fail("trace-scene requires a scene file path before options.");
+        return failParse(errorMessage, "trace-scene requires a scene file path before options.");
 
     for (int i = 1; i < args.size(); ++i) {
         const QString option = args[i];
 
         if (option == "--rays") {
             if (parsed->hasRays)
-                return fail("--rays was specified more than once.");
+                return failParse(errorMessage, "--rays was specified more than once.");
             if (++i >= args.size())
-                return fail("--rays requires a positive integer value.");
+                return failParse(errorMessage, "--rays requires a positive integer value.");
             if (!parseUnsignedLongOption("--rays", args[i], false, &parsed->rays, errorMessage))
                 return false;
             parsed->hasRays = true;
         } else if (option == "--seed") {
             if (parsed->hasSeed)
-                return fail("--seed was specified more than once.");
+                return failParse(errorMessage, "--seed was specified more than once.");
             if (++i >= args.size())
-                return fail("--seed requires an integer value.");
+                return failParse(errorMessage, "--seed requires an integer value.");
             if (!parseUnsignedLongOption("--seed", args[i], true, &parsed->seed, errorMessage))
                 return false;
             parsed->hasSeed = true;
         } else if (option == "--no-export") {
             if (parsed->noExport)
-                return fail("--no-export was specified more than once.");
+                return failParse(errorMessage, "--no-export was specified more than once.");
             parsed->noExport = true;
         } else {
-            return fail(QString("Unknown trace-scene option: %1.").arg(option));
+            return failParse(errorMessage, QString("Unknown trace-scene option: %1.").arg(option));
         }
     }
 
     if (!parsed->hasRays)
-        return fail("trace-scene requires --rays N.");
+        return failParse(errorMessage, "trace-scene requires --rays N.");
     if (!parsed->hasSeed)
-        return fail("trace-scene requires --seed S.");
+        return failParse(errorMessage, "trace-scene requires --seed S.");
     if (!parsed->noExport)
-        return fail("trace-scene currently requires --no-export.");
+        return failParse(errorMessage, "trace-scene currently requires --no-export.");
 
     return true;
 }

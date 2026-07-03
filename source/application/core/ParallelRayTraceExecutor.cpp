@@ -1,6 +1,7 @@
 #include "ParallelRayTraceExecutor.h"
 
 #include <atomic>
+#include <cstring>
 #include <memory>
 
 #include <QElapsedTimer>
@@ -32,10 +33,53 @@ namespace
 {
 constexpr int kGuiProgressPartitions = 100;
 
-struct RayTraceTask
+struct TraceDiagnosticState
 {
-    int index = 0;
-    ulong rays = 0;
+    QMutex mutex;
+    std::atomic<int> nextInvocation{0};
+};
+
+class RayTraceDiagnosticCallback
+{
+public:
+    explicit RayTraceDiagnosticCallback(std::shared_ptr<TraceDiagnosticState> state):
+        m_state(state)
+    {
+    }
+
+    void operator()(const char* event, ulong raysCompleted) const
+    {
+        if (!m_state)
+            return;
+
+        static thread_local const TraceDiagnosticState* currentState = nullptr;
+        static thread_local int currentInvocation = 0;
+
+        if (currentState != m_state.get()) {
+            currentState = m_state.get();
+            currentInvocation = 0;
+        }
+
+        if (event && std::strcmp(event, "operator_enter") == 0)
+            currentInvocation = m_state->nextInvocation.fetch_add(1) + 1;
+        else if (currentInvocation == 0)
+            currentInvocation = m_state->nextInvocation.fetch_add(1) + 1;
+
+        if (currentInvocation > 5)
+            return;
+
+        QMutexLocker lock(&m_state->mutex);
+        QTextStream out(stdout);
+        out << "ray_task_" << QString::fromLatin1(event ? event : "unknown")
+            << ": count=" << currentInvocation
+            << ", active_threads=" << QThreadPool::globalInstance()->activeThreadCount();
+        if (raysCompleted > 0)
+            out << ", rays_completed=" << static_cast<qulonglong>(raysCompleted);
+        out << Qt::endl;
+    }
+
+private:
+    std::shared_ptr<TraceDiagnosticState> m_state;
 };
 
 bool fail(QString* errorMessage, const QString& message)
@@ -49,23 +93,6 @@ void reportProgress(const ParallelRayTraceExecutor::ProgressCallback& progress, 
 {
     if (progress)
         progress(message);
-}
-
-QString formatRayProgress(ulong traced, ulong total)
-{
-    return QString("Traced %1/%2 rays.")
-        .arg(QString::number(static_cast<qulonglong>(traced)))
-        .arg(QString::number(static_cast<qulonglong>(total)));
-}
-
-QVector<RayTraceTask> makeTasks(ulong rays)
-{
-    const QVector<ulong> partitions = ParallelRayTraceExecutor::guiRaysPerThread(rays);
-    QVector<RayTraceTask> tasks;
-    tasks.reserve(partitions.size());
-    for (int index = 0; index < partitions.size(); ++index)
-        tasks.push_back(RayTraceTask{index, partitions[index]});
-    return tasks;
 }
 
 QString formatFirstRayCounts(const QVector<ulong>& raysPerThread)
@@ -83,7 +110,6 @@ QString formatFirstRayCounts(const QVector<ulong>& raysPerThread)
 
 void writeRayLoopDiagnostics(const ParallelRayTraceOptions& options,
                              const QVector<ulong>& raysPerThread,
-                             const QVector<RayTraceTask>& tasks,
                              bool photonBufferEnabled,
                              bool hitCallbackEnabled)
 {
@@ -94,7 +120,7 @@ void writeRayLoopDiagnostics(const ParallelRayTraceOptions& options,
     out << "ray_loop_diagnostics:" << Qt::endl;
     out << "  rays_per_thread_size: " << raysPerThread.size() << Qt::endl;
     out << "  rays_per_thread_first: [" << formatFirstRayCounts(raysPerThread) << "]" << Qt::endl;
-    out << "  task_count: " << tasks.size() << Qt::endl;
+    out << "  task_count: " << raysPerThread.size() << Qt::endl;
     if (options.requestedWorkerCount > 0)
         out << "  requested_worker_count: " << options.requestedWorkerCount << Qt::endl;
     else
@@ -105,28 +131,6 @@ void writeRayLoopDiagnostics(const ParallelRayTraceOptions& options,
     out << "  record_photons: " << (options.recordPhotons ? "true" : "false") << Qt::endl;
     out << "  photon_buffer_enabled: " << (photonBufferEnabled ? "true" : "false") << Qt::endl;
     out << "  hit_callback_enabled: " << (hitCallbackEnabled ? "true" : "false") << Qt::endl;
-}
-
-void writeTaskDiagnostic(const ParallelRayTraceOptions& options,
-                         QMutex* diagnosticMutex,
-                         const QString& event,
-                         const RayTraceTask& task,
-                         int count,
-                         ulong raysCompleted = 0)
-{
-    if (!options.diagnosticOutput || count > 5)
-        return;
-
-    QMutexLocker lock(diagnosticMutex);
-    QTextStream out(stdout);
-    out << "ray_task_" << event
-        << ": count=" << count
-        << ", index=" << task.index
-        << ", rays=" << static_cast<qulonglong>(task.rays)
-        << ", active_threads=" << QThreadPool::globalInstance()->activeThreadCount();
-    if (raysCompleted > 0)
-        out << ", rays_completed=" << static_cast<qulonglong>(raysCompleted);
-    out << Qt::endl;
 }
 }
 
@@ -153,8 +157,7 @@ bool ParallelRayTraceExecutor::trace(TSceneKit* scene,
                                      ParallelRayTraceResult* result,
                                      QString* errorMessage,
                                      const ProgressCallback& progress,
-                                     const HitCallback& hitCallback,
-                                     const TaskHitCallbackFactory& taskHitCallbackFactory) const
+                                     const HitCallback& hitCallback) const
 {
     if (result)
         *result = ParallelRayTraceResult();
@@ -238,54 +241,33 @@ bool ParallelRayTraceExecutor::trace(TSceneKit* scene,
     RandomSTL random(options.seed);
     QMutex mutexRandom;
     QMutex mutexPhotonBuffer;
-    QMutex progressMutex;
-    QMutex diagnosticMutex;
     std::atomic_bool exportFailed(false);
-    std::atomic<ulong> traced(0);
-    std::atomic<int> tasksStarted(0);
-    std::atomic<int> tasksFinished(0);
 
-    const QVector<ulong> raysPerThread = guiRaysPerThread(options.rays);
-    QVector<RayTraceTask> tasks = makeTasks(options.rays);
+    QVector<ulong> raysPerThread = guiRaysPerThread(options.rays);
     if (result) {
         result->sunApertureArea = sunAperture->getArea();
         result->irradiance = sunPosition->irradiance.getValue();
         result->powerPerRay = options.rays > 0 ? result->sunApertureArea * result->irradiance / options.rays : 0.;
         result->workerCount = qMax(1, QThread::idealThreadCount());
         result->chunkSize = raysPerThread.isEmpty() ? 0 : raysPerThread.first();
-        result->chunkCount = static_cast<qulonglong>(tasks.size());
+        result->chunkCount = static_cast<qulonglong>(raysPerThread.size());
     }
 
     reportProgress(progress, "Starting ray loop.");
     writeRayLoopDiagnostics(
         options,
         raysPerThread,
-        tasks,
         photonBuffer != nullptr,
-        static_cast<bool>(hitCallback) || static_cast<bool>(taskHitCallbackFactory)
+        static_cast<bool>(hitCallback)
     );
-    QFuture<void> future = QtConcurrent::map(tasks, [&](RayTraceTask& task) {
-        if (exportFailed.load())
-            return;
 
-        const int startedCount = tasksStarted.fetch_add(1) + 1;
-        writeTaskDiagnostic(options, &diagnosticMutex, "start", task, startedCount);
+    RayTracer::TraceCallback traceCallback;
+    if (options.diagnosticOutput)
+        traceCallback = RayTraceDiagnosticCallback(std::make_shared<TraceDiagnosticState>());
 
-        const HitCallback taskHitCallback = taskHitCallbackFactory ? taskHitCallbackFactory(task.index) : hitCallback;
-        RayTracer::TraceCallback traceCallback;
-        if (options.diagnosticOutput && startedCount <= 5) {
-            traceCallback = [&, task, startedCount](const char* event, ulong raysCompleted) {
-                writeTaskDiagnostic(
-                    options,
-                    &diagnosticMutex,
-                    QString::fromLatin1(event),
-                    task,
-                    startedCount,
-                    raysCompleted
-                );
-            };
-        }
-        RayTracer tracer(
+    QFuture<void> future = QtConcurrent::map(
+        raysPerThread,
+        RayTracer(
             instanceLayout,
             &instanceSun,
             sunAperture,
@@ -297,32 +279,17 @@ bool ParallelRayTraceExecutor::trace(TSceneKit* scene,
             photonBuffer ? &mutexPhotonBuffer : nullptr,
             exportSurfaceList,
             &exportFailed,
-            taskHitCallback,
+            hitCallback,
             traceCallback
-        );
-        writeTaskDiagnostic(options, &diagnosticMutex, "constructed", task, startedCount);
-        writeTaskDiagnostic(options, &diagnosticMutex, "operator_call", task, startedCount);
-        tracer(task.rays);
-        const int finishedCount = tasksFinished.fetch_add(1) + 1;
-        writeTaskDiagnostic(options, &diagnosticMutex, "finish", task, finishedCount);
-        if (exportFailed.load())
-            return;
-
-        const ulong tracedNow = traced.fetch_add(task.rays) + task.rays;
-        if (progress && task.rays > 0) {
-            QMutexLocker lock(&progressMutex);
-            reportProgress(progress, formatRayProgress(qMin(tracedNow, options.rays), options.rays));
-        }
-    });
+        )
+    );
     future.waitForFinished();
 
     const double powerPerRay = result ? result->powerPerRay : (sunAperture->getArea() * sunPosition->irradiance.getValue() / options.rays);
     if (localPhotonBuffer && !localPhotonBuffer->endExport(powerPerRay))
         exportFailed.store(true);
 
-    const ulong raysTraced = traced.load();
-    if (!exportFailed.load() && raysTraced != options.rays)
-        return fail(errorMessage, "Ray tracing did not complete all requested rays.");
+    const ulong raysTraced = exportFailed.load() ? 0 : options.rays;
 
     const double elapsedSeconds = static_cast<double>(timer.elapsed()) / 1000.;
     if (result) {

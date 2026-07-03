@@ -44,7 +44,6 @@ class ParallelRayTraceExecutor
 public:
     using ProgressCallback = std::function<void(const QString&)>;
     using HitCallback = std::function<void(const RayTracerHit&)>;
-    using TaskHitCallbackFactory = std::function<HitCallback(int)>;
 
     static QVector<ulong> guiRaysPerThread(ulong rays);
     static qulonglong taskCountForRays(ulong rays);
@@ -54,6 +53,5 @@ public:
                ParallelRayTraceResult* result,
                QString* errorMessage,
                const ProgressCallback& progress = ProgressCallback(),
-               const HitCallback& hitCallback = HitCallback(),
-               const TaskHitCallbackFactory& taskHitCallbackFactory = TaskHitCallbackFactory()) const;
+               const HitCallback& hitCallback = HitCallback()) const;
 };

@@ -1,9 +1,11 @@
 #include "BenchmarkRunner.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -17,6 +19,7 @@
 #include <QSaveFile>
 #include <QStringList>
 #include <QTextStream>
+#include <QThreadPool>
 #include <QtEndian>
 
 #include "core/ParallelRayTraceExecutor.h"
@@ -505,6 +508,68 @@ private:
     double m_yBinScale = 1.;
 };
 
+class TextProgressReporter
+{
+public:
+    explicit TextProgressReporter(QTextStream* stream):
+        m_stream(stream)
+    {
+    }
+
+    void operator()(const QString& message) const
+    {
+        if (m_stream)
+            *m_stream << message << Qt::endl;
+    }
+
+private:
+    QTextStream* m_stream = nullptr;
+};
+
+struct BenchmarkHitState
+{
+    explicit BenchmarkHitState(std::vector<BenchmarkAccumulator>* accumulators):
+        accumulators(accumulators)
+    {
+    }
+
+    std::vector<BenchmarkAccumulator>* accumulators = nullptr;
+    std::atomic<int> nextAccumulator{0};
+};
+
+class BenchmarkHitCallback
+{
+public:
+    explicit BenchmarkHitCallback(std::shared_ptr<BenchmarkHitState> state):
+        m_state(state)
+    {
+    }
+
+    void operator()(const RayTracerHit& hit) const
+    {
+        // Direct QtConcurrent::map(raysPerThread, RayTracer(...)) provides no
+        // task index, so benchmark hits are accumulated per worker thread.
+        if (!m_state || !m_state->accumulators || m_state->accumulators->empty())
+            return;
+
+        static thread_local const BenchmarkHitState* currentState = nullptr;
+        static thread_local int accumulatorIndex = -1;
+
+        if (currentState != m_state.get()) {
+            currentState = m_state.get();
+            accumulatorIndex = m_state->nextAccumulator.fetch_add(1);
+        }
+
+        if (accumulatorIndex < 0 || static_cast<size_t>(accumulatorIndex) >= m_state->accumulators->size())
+            return;
+
+        (*m_state->accumulators)[static_cast<size_t>(accumulatorIndex)].onHit(hit);
+    }
+
+private:
+    std::shared_ptr<BenchmarkHitState> m_state;
+};
+
 bool writeResult(const QString& outputFileName, const QJsonObject& result, QString* errorMessage)
 {
     QFileInfo info(outputFileName);
@@ -742,30 +807,28 @@ int BenchmarkRunner::run(const QString& configFileName, TSceneKit* scene, QStrin
     options.requestedWorkerCount = config.workerCount;
     Q_UNUSED(config.chunkSize)
 
-    std::vector<BenchmarkAccumulator> taskAccumulators;
+    std::vector<BenchmarkAccumulator> threadAccumulators;
     const qulonglong taskCount = ParallelRayTraceExecutor::taskCountForRays(config.rays);
-    taskAccumulators.reserve(static_cast<size_t>(taskCount));
-    for (qulonglong task = 0; task < taskCount; ++task)
-        taskAccumulators.emplace_back(config);
+    const qulonglong poolThreadCount = static_cast<qulonglong>(qMax(1, QThreadPool::globalInstance()->maxThreadCount()));
+    const qulonglong accumulatorCount = qMax(taskCount, poolThreadCount);
+    threadAccumulators.reserve(static_cast<size_t>(accumulatorCount));
+    for (qulonglong index = 0; index < accumulatorCount; ++index)
+        threadAccumulators.emplace_back(config);
 
     ParallelRayTraceResult traceResult;
     ParallelRayTraceExecutor executor;
     QString traceError;
-    if (!executor.trace(scene, options, &traceResult, &traceError, [&out](const QString& message) {
-            out << message << Qt::endl;
-        }, ParallelRayTraceExecutor::HitCallback(), [&taskAccumulators](int taskIndex) {
-            return [&taskAccumulators, taskIndex](const RayTracerHit& hit) {
-                taskAccumulators[static_cast<size_t>(taskIndex)].onHit(hit);
-            };
-        })) {
+    const std::shared_ptr<BenchmarkHitState> hitState = std::make_shared<BenchmarkHitState>(&threadAccumulators);
+    const BenchmarkHitCallback hitCallback(hitState);
+    if (!executor.trace(scene, options, &traceResult, &traceError, TextProgressReporter(&out), hitCallback)) {
         return fail(errorMessage, QString("Benchmark trace failed: %1").arg(traceError)), 1;
     }
     if (!std::isfinite(traceResult.powerPerRay) || traceResult.powerPerRay < 0.)
         return fail(errorMessage, "Benchmark trace produced invalid power-per-ray."), 1;
 
     BenchmarkAccumulator accumulator(config);
-    for (const BenchmarkAccumulator& taskAccumulator : taskAccumulators)
-        accumulator.merge(taskAccumulator);
+    for (const BenchmarkAccumulator& threadAccumulator : threadAccumulators)
+        accumulator.merge(threadAccumulator);
 
     const BenchmarkMetrics metrics = accumulator.metrics(traceResult.powerPerRay);
     if (!std::isfinite(metrics.totalPowerMw) ||
