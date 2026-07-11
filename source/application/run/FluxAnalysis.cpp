@@ -10,11 +10,11 @@
 #include <QProgressDialog>
 
 #include <Inventor/actions/SoGetBoundingBoxAction.h>
-#include <Inventor/nodes/SoTransform.h>
 #include <Inventor/nodes/SoGroup.h>
 
 #include "tree/SceneTreeModel.h"
 #include "core/RayTraceExecutor.h"
+#include "core/TracePreparation.h"
 #include "kernel/air/AirTransmission.h"
 #include "kernel/run/InstanceNode.h"
 #include "kernel/photons/PhotonsBuffer.h"
@@ -26,7 +26,6 @@
 #include "kernel/sun/SunKit.h"
 #include "kernel/sun/SunPosition.h"
 #include "kernel/sun/SunAperture.h"
-#include "libraries/math/3D/Transform.h"
 #include "libraries/math/gcf.h"
 #include "kernel/profiles/ProfileRT.h"
 #include "libraries/math/2D/Matrix2D.h"
@@ -104,9 +103,7 @@ void FluxAnalysis::run(QString nodeURL, QString surfaceSide, ulong nRays, bool p
     InstanceNode instanceSun(sunKit);
 
     SunPosition* sunPosition = (SunPosition*) sunKit->getPart("position", false);
-    SunShape* sunShape = (SunShape*) sunKit->getPart("shape", false);
     SunAperture* sunAperture = (SunAperture*) sunKit->getPart("aperture", false);
-    SoTransform* sunTransform = sunKit->m_transform;
 
     if (!m_rand) return;
 
@@ -137,18 +134,6 @@ void FluxAnalysis::run(QString nodeURL, QString surfaceSide, ulong nRays, bool p
     if (!instanceNode) return;
     exportSuraceList << instanceNode;
 
-    //UpdateLightSize(); from MainWindow
-    sunKit->setBox(m_sceneKit);
-    m_sceneModel->UpdateSceneModel();
-
-    //Compute bounding boxes and world to object transforms
-    m_instanceLayout->updateTree(Transform::Identity);
-
-    if (!sunKit->findTexture(m_sunDivs.x, m_sunDivs.y, m_instanceLayout)) return;
-
-    Transform lightToWorld = tgf::makeTransform(sunTransform);
-    instanceSun.setTransform(lightToWorld);
-
 //    QThreadPool::globalInstance()->setMaxThreadCount(1);
     // Create a progress dialog.
     QProgressDialog dialog;
@@ -169,10 +154,26 @@ void FluxAnalysis::run(QString nodeURL, QString surfaceSide, ulong nRays, bool p
     if (air->getTypeId() != AirTransmission::getClassTypeId())
         airTemp = air;
 
+    GuiTracePreparationInput preparationInput;
+    preparationInput.scene = m_sceneKit;
+    preparationInput.layoutRoot = m_instanceLayout;
+    preparationInput.sunInstance = &instanceSun;
+    preparationInput.random = m_rand;
+    preparationInput.photonBuffer = m_photons;
+    preparationInput.exportSurfaceList = exportSuraceList;
+    preparationInput.tracingAir = airTemp;
+    preparationInput.rays = nRays;
+    preparationInput.sunWidthDivisions = m_sunDivs.x;
+    preparationInput.sunHeightDivisions = m_sunDivs.y;
+    preparationInput.sizeSunFromScene = true;
+    preparationInput.synchronizeScene = [this]() { m_sceneModel->UpdateSceneModel(); };
+    PreparedTraceContext context;
+    QString preparationError;
+    if (!TracePreparation::prepareGuiTrace(preparationInput, &context, &preparationError))
+        return;
+
     RayTraceExecutor executor;
-    RayTraceExecution execution = executor.start(nRays, m_instanceLayout, &instanceSun,
-                                                 sunAperture, sunShape, airTemp, m_rand,
-                                                 m_photons, exportSuraceList);
+    RayTraceExecution execution = executor.start(std::move(context));
     if (!execution.started) {
         qWarning() << execution.errorMessage;
         return;

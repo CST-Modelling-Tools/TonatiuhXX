@@ -32,6 +32,7 @@ set(HEADERS
     core/RayTraceExecutor.h
     core/SceneInstanceBuilder.h
     core/SceneLoader.h
+    core/TracePreparation.h
     core/TonatiuhCore.h
     headless/HeadlessCommandRunner.h
     headless/HeadlessScriptHost.h
@@ -110,6 +111,7 @@ set(SOURCES
     core/RayTraceExecutor.cpp
     core/SceneInstanceBuilder.cpp
     core/SceneLoader.cpp
+    core/TracePreparation.cpp
     core/TonatiuhCore.cpp
     headless/HeadlessCommandRunner.cpp
     headless/HeadlessScriptHost.cpp

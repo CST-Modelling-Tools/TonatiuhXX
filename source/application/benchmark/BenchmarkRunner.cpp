@@ -12,6 +12,7 @@
 #include <QCryptographicHash>
 #include <QDebug>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
@@ -24,6 +25,7 @@
 #include <QtEndian>
 
 #include "core/RayTraceExecutor.h"
+#include "core/TracePreparation.h"
 #include "kernel/run/RayTracer.h"
 #include "libraries/math/gcf.h"
 
@@ -819,10 +821,6 @@ int BenchmarkRunner::run(const QString& configFileName, TSceneKit* scene, QStrin
     if (!fluxGridBinaryOutputFileName.isEmpty())
         out << "flux_grid_binary_output_file: " << fluxGridBinaryOutputFileName << Qt::endl;
 
-    RayTraceExecutorOptions options;
-    options.rays = config.rays;
-    options.seed = config.seed;
-    options.recordPhotons = false;
     std::vector<BenchmarkAccumulator> threadAccumulators;
     const qulonglong taskCount = RayTraceExecutor::taskCountForRays(config.rays);
     const qulonglong poolThreadCount = static_cast<qulonglong>(qMax(1, QThreadPool::globalInstance()->maxThreadCount()));
@@ -847,7 +845,27 @@ int BenchmarkRunner::run(const QString& configFileName, TSceneKit* scene, QStrin
     const RayTraceExecutor::HitCallback traceHitCallback = nullCollection
         ? RayTraceExecutor::HitCallback()
         : RayTraceExecutor::HitCallback(hitCallback);
-    if (!executor.trace(scene, options, &traceResult, &traceError, TextProgressReporter(&out), traceHitCallback)) {
+    QElapsedTimer traceTimer;
+    traceTimer.start();
+    TextProgressReporter progress(&out);
+    HeadlessTracePreparationInput preparationInput;
+    preparationInput.scene = scene;
+    preparationInput.rays = config.rays;
+    preparationInput.seed = config.seed;
+    preparationInput.hitCallback = traceHitCallback;
+    preparationInput.progress = progress;
+    PreparedTraceContext context;
+    if (!TracePreparation::prepareHeadlessTrace(preparationInput, &context, &traceError)) {
+        return fail(errorMessage, QString("Benchmark trace failed: %1").arg(traceError)), 1;
+    }
+    TracePreparation::initializeResult(context, &traceResult);
+    progress("Starting ray loop.");
+    RayTraceExecution execution = executor.start(std::move(context));
+    if (!execution.started) {
+        return fail(errorMessage, QString("Benchmark trace failed: %1").arg(execution.errorMessage)), 1;
+    }
+    if (!executor.waitForFinished(&execution, &traceError) ||
+        !TracePreparation::finalizeResult(*execution.context(), executor.exportFailed(), traceTimer.elapsed() / 1000., &traceResult, &traceError)) {
         return fail(errorMessage, QString("Benchmark trace failed: %1").arg(traceError)), 1;
     }
     if (!std::isfinite(traceResult.powerPerRay) || traceResult.powerPerRay < 0.)

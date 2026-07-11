@@ -3,6 +3,7 @@
 #include <limits>
 
 #include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QFileInfo>
 #include <QTextStream>
 
@@ -10,6 +11,7 @@
 #include "core/CorePluginRegistry.h"
 #include "core/RayTraceExecutor.h"
 #include "core/SceneLoader.h"
+#include "core/TracePreparation.h"
 #include "core/TonatiuhCore.h"
 #include "headless/HeadlessScriptHost.h"
 
@@ -122,14 +124,30 @@ int HeadlessCommandRunner::traceScene(const QStringList& args) const
     out << "photon_export: false" << Qt::endl;
     out << "export_path: none" << Qt::endl;
 
-    RayTraceExecutorOptions options;
-    options.rays = parsed.rays;
-    options.seed = parsed.seed;
-    options.recordPhotons = false;
-
+    QElapsedTimer timer;
+    timer.start();
+    TextProgressReporter progress(&out);
+    HeadlessTracePreparationInput preparationInput;
+    preparationInput.scene = scene.get();
+    preparationInput.rays = parsed.rays;
+    preparationInput.seed = parsed.seed;
+    preparationInput.progress = progress;
+    PreparedTraceContext context;
     RayTraceExecutorResult result;
+    if (!TracePreparation::prepareHeadlessTrace(preparationInput, &context, &errorMessage)) {
+        err << "Trace failed: " << errorMessage << Qt::endl;
+        return 1;
+    }
+    TracePreparation::initializeResult(context, &result);
+    progress("Starting ray loop.");
     RayTraceExecutor executor;
-    if (!executor.trace(scene.get(), options, &result, &errorMessage, TextProgressReporter(&out))) {
+    RayTraceExecution execution = executor.start(std::move(context));
+    if (!execution.started) {
+        err << "Trace failed: " << execution.errorMessage << Qt::endl;
+        return 1;
+    }
+    if (!executor.waitForFinished(&execution, &errorMessage) ||
+        !TracePreparation::finalizeResult(*execution.context(), executor.exportFailed(), timer.elapsed() / 1000., &result, &errorMessage)) {
         err << "Trace failed: " << errorMessage << Qt::endl;
         return 1;
     }

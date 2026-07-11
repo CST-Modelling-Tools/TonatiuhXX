@@ -4,6 +4,7 @@
 #include <limits>
 
 #include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QDir>
 #include <QFile>
 #include <QFileDevice>
@@ -15,6 +16,7 @@
 #include "core/CorePluginRegistry.h"
 #include "core/RayTraceExecutor.h"
 #include "core/SceneLoader.h"
+#include "core/TracePreparation.h"
 #include "core/TonatiuhCore.h"
 
 namespace
@@ -239,14 +241,27 @@ QJSValue HeadlessScriptApi::traceScene(const QJSValue& optionsValue)
         return QJSValue();
     }
 
-    RayTraceExecutorOptions options;
-    options.rays = rays;
-    options.seed = seed;
-    options.recordPhotons = false;
-
+    QElapsedTimer timer;
+    timer.start();
+    HeadlessTracePreparationInput preparationInput;
+    preparationInput.scene = scene.get();
+    preparationInput.rays = rays;
+    preparationInput.seed = seed;
+    PreparedTraceContext context;
     RayTraceExecutorResult result;
+    if (!TracePreparation::prepareHeadlessTrace(preparationInput, &context, &errorMessage)) {
+        recordError(QString("tn.traceScene failed for %1: %2").arg(absoluteFilePath(sceneFileName), errorMessage));
+        return QJSValue();
+    }
+    TracePreparation::initializeResult(context, &result);
     RayTraceExecutor executor;
-    if (!executor.trace(scene.get(), options, &result, &errorMessage)) {
+    RayTraceExecution execution = executor.start(std::move(context));
+    if (!execution.started) {
+        recordError(QString("tn.traceScene failed for %1: %2").arg(absoluteFilePath(sceneFileName), execution.errorMessage));
+        return QJSValue();
+    }
+    if (!executor.waitForFinished(&execution, &errorMessage) ||
+        !TracePreparation::finalizeResult(*execution.context(), executor.exportFailed(), timer.elapsed() / 1000., &result, &errorMessage)) {
         recordError(QString("tn.traceScene failed for %1: %2").arg(absoluteFilePath(sceneFileName), errorMessage));
         return QJSValue();
     }

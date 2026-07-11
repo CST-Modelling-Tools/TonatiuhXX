@@ -61,6 +61,7 @@
 #include "commands/CmdSetFieldText.h"
 #include "commands/CmdPaste.h"
 #include "core/RayTraceExecutor.h"
+#include "core/TracePreparation.h"
 
 #include "PluginManager.h"
 #include "kernel/node/TonatiuhFunctions.h"
@@ -1983,18 +1984,9 @@ void MainWindow::Run()
         exportSurfaceList << node;
     }
 
-    instanceLayout->updateTree(Transform::Identity);
-
     SunKit* sunKit = (SunKit*) instanceSun.getNode();
     SunPosition* sunPosition = (SunPosition*) sunKit->getPart("position", false);
-    SunShape* sunShape = (SunShape*) sunKit->getPart("shape", false);
     SunAperture* sunAperture = (SunAperture*) sunKit->getPart("aperture", false);
-    if (!sunKit->findTexture(m_raysGridWidth, m_raysGridHeight, instanceLayout))
-    {
-        emit Abort(tr("There are no surfaces defined for ray tracing") );
-        ShowRaysIn3DView(); // cleaning?
-        return;
-    }
 
     // single thread for gprof
     //        QThreadPool::globalInstance()->setMaxThreadCount(1);
@@ -2016,10 +2008,27 @@ void MainWindow::Run()
     if (air->getTypeId() != AirVacuum::getClassTypeId())
         airTemp = air;
 
+    GuiTracePreparationInput preparationInput;
+    preparationInput.scene = m_document->getSceneKit();
+    preparationInput.layoutRoot = instanceLayout;
+    preparationInput.sunInstance = &instanceSun;
+    preparationInput.random = m_rand;
+    preparationInput.photonBuffer = m_photonsBuffer;
+    preparationInput.exportSurfaceList = exportSurfaceList;
+    preparationInput.tracingAir = airTemp;
+    preparationInput.rays = m_raysNumber;
+    preparationInput.sunWidthDivisions = m_raysGridWidth;
+    preparationInput.sunHeightDivisions = m_raysGridHeight;
+    PreparedTraceContext context;
+    QString preparationError;
+    if (!TracePreparation::prepareGuiTrace(preparationInput, &context, &preparationError)) {
+        emit Abort(tr("There are no surfaces defined for ray tracing"));
+        ShowRaysIn3DView();
+        return;
+    }
+
     RayTraceExecutor executor;
-    RayTraceExecution execution = executor.start(m_raysNumber, instanceLayout, &instanceSun,
-                                                 sunAperture, sunShape, airTemp, m_rand,
-                                                 m_photonsBuffer, exportSurfaceList);
+    RayTraceExecution execution = executor.start(std::move(context));
     if (!execution.started) {
         QMessageBox::warning(this, "Tonatiuh", execution.errorMessage);
         return;

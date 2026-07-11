@@ -17,22 +17,10 @@ class Random;
 class AirTransmission;
 class SunAperture;
 class SunShape;
-class TSceneKit;
 class RayTraceExecutor;
+class PreparedTraceContext;
 struct RayTracerHit;
 struct RayTraceDiagnostics;
-
-struct RayTraceExecutorOptions
-{
-    ulong rays = 0;
-    ulong seed = 0;
-    int sunWidthDivisions = 200;
-    int sunHeightDivisions = 200;
-    ulong photonBufferSize = 1'000'000;
-    PhotonsBuffer* photonBuffer = nullptr;
-    QVector<InstanceNode*> exportSurfaceList;
-    bool recordPhotons = true;
-};
 
 struct RayTraceExecutorResult
 {
@@ -50,10 +38,17 @@ struct RayTraceExecutorResult
 
 struct RayTraceExecution
 {
+private:
+    // Declared before the future so prepared worker inputs are destroyed after
+    // the future state if a handle is released unexpectedly.
+    std::shared_ptr<PreparedTraceContext> preparedContext;
+
+public:
     RayTraceExecution() = default;
     RayTraceExecution(const RayTraceExecution&) = delete;
     RayTraceExecution& operator=(const RayTraceExecution&) = delete;
     RayTraceExecution(RayTraceExecution&& other):
+        preparedContext(std::move(other.preparedContext)),
         started(other.started),
         future(std::move(other.future)),
         errorMessage(std::move(other.errorMessage)),
@@ -67,6 +62,7 @@ struct RayTraceExecution
     bool started = false;
     QFuture<void> future;
     QString errorMessage;
+    const PreparedTraceContext* context() const { return preparedContext.get(); }
 
 private:
     const RayTraceExecutor* owner = nullptr;
@@ -86,28 +82,12 @@ public:
 
     // One executor instance supports one active execution at a time. Every
     // successful launch must be completed through waitForFinished().
-    RayTraceExecution start(ulong rays,
-                            InstanceNode* instanceLayout,
-                            InstanceNode* instanceSun,
-                            SunAperture* sunAperture,
-                            SunShape* sunShape,
-                            AirTransmission* air,
-                            Random* random,
-                            PhotonsBuffer* photonBuffer,
-                            const QVector<InstanceNode*>& exportSurfaceList,
-                            const HitCallback& hitCallback = HitCallback());
+    RayTraceExecution start(PreparedTraceContext&& context);
 
     bool waitForFinished(RayTraceExecution* execution, QString* errorMessage = nullptr) noexcept;
     bool isRunning() const { return m_active.load(); }
 
     bool exportFailed() const { return m_exportFailed.load(); }
-
-    bool trace(TSceneKit* scene,
-               const RayTraceExecutorOptions& options,
-               RayTraceExecutorResult* result,
-               QString* errorMessage,
-               const ProgressCallback& progress = ProgressCallback(),
-               const HitCallback& hitCallback = HitCallback());
 
 private:
     QMutex m_randomMutex;
@@ -116,4 +96,5 @@ private:
     std::atomic_bool m_exportFailed{false};
     QVector<ulong> m_rayPartitions;
     std::shared_ptr<RayTraceDiagnostics> m_diagnostics;
+    std::shared_ptr<PreparedTraceContext> m_activeContext;
 };
