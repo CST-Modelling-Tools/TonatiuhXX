@@ -1,5 +1,6 @@
 #include <QPoint>
 #include <QDebug>
+#include <QElapsedTimer>
 #include <QThread>
 
 #include "shape/DifferentialGeometry.h"
@@ -11,6 +12,60 @@
 #include "sun/SunShape.h"
 #include "air/AirTransmission.h"
 
+namespace
+{
+void updateMaximum(std::atomic<qint64>& maximum, qint64 value)
+{
+    qint64 current = maximum.load();
+    while (current < value && !maximum.compare_exchange_weak(current, value)) {
+    }
+}
+
+void updateMaximum(std::atomic<int>& maximum, int value)
+{
+    int current = maximum.load();
+    while (current < value && !maximum.compare_exchange_weak(current, value)) {
+    }
+}
+}
+
+void RayTraceDiagnostics::start()
+{
+    m_wallTimer.start();
+}
+
+void RayTraceDiagnostics::partitionStarted()
+{
+    const int active = activePartitions.fetch_add(1) + 1;
+    updateMaximum(maximumActivePartitions, active);
+    QMutexLocker locker(&m_workerThreadsMutex);
+    m_workerThreads.insert(reinterpret_cast<quintptr>(QThread::currentThreadId()));
+}
+
+void RayTraceDiagnostics::partitionFinished()
+{
+    activePartitions.fetch_sub(1);
+}
+
+void RayTraceDiagnostics::recordRandomStats(quint64 refillCount, qint64 mutexWaitNanoseconds, qint64 refillNanoseconds)
+{
+    totalRefillCount.fetch_add(refillCount);
+    summedMutexWaitNanoseconds.fetch_add(mutexWaitNanoseconds);
+    summedRefillNanoseconds.fetch_add(refillNanoseconds);
+    updateMaximum(maximumPartitionMutexWaitNanoseconds, mutexWaitNanoseconds);
+    updateMaximum(maximumPartitionRefillNanoseconds, refillNanoseconds);
+}
+
+int RayTraceDiagnostics::distinctWorkerThreadCount() const
+{
+    QMutexLocker locker(&m_workerThreadsMutex);
+    return m_workerThreads.size();
+}
+
+qint64 RayTraceDiagnostics::wallNanoseconds() const
+{
+    return m_wallTimer.isValid() ? m_wallTimer.nsecsElapsed() : 0;
+}
 
 RayTracer::RayTracer(InstanceNode* instanceRoot,
     InstanceNode* instanceSun,
@@ -23,7 +78,8 @@ RayTracer::RayTracer(InstanceNode* instanceRoot,
     QMutex* mutexPhotons,
     QVector<InstanceNode*> exportSuraceList,
     std::atomic_bool* exportFailed,
-    HitCallback hitCallback
+    HitCallback hitCallback,
+    RayTraceDiagnostics* diagnostics
 ):
     m_instanceLayout(instanceRoot),
     m_instanceSun(instanceSun),
@@ -37,6 +93,7 @@ RayTracer::RayTracer(InstanceNode* instanceRoot,
     m_mutexPhotonsBuffer(mutexPhotons),
     m_exportFailed(exportFailed),
     m_hitCallback(hitCallback),
+    m_diagnostics(diagnostics),
     m_exportSurfaceList(exportSuraceList),
     m_sunCells(sunAperture->getCells())
 {
@@ -50,26 +107,44 @@ void RayTracer::operator()(ulong nRays)
         bool enabled;
         ulong rays;
 
-        PartitionDiagnostic(bool enabled, ulong rays):
+        RayTraceDiagnostics* aggregate = nullptr;
+
+        PartitionDiagnostic(bool enabled, ulong rays, RayTraceDiagnostics* aggregate):
             enabled(enabled),
-            rays(rays)
+            rays(rays),
+            aggregate(aggregate)
         {
+            if (aggregate)
+                aggregate->partitionStarted();
             if (enabled)
                 qInfo() << "RayTraceExecutor partition start: thread=" << QThread::currentThreadId() << "rays=" << rays;
         }
 
         ~PartitionDiagnostic()
         {
+            if (aggregate)
+                aggregate->partitionFinished();
             if (enabled)
                 qInfo() << "RayTraceExecutor partition finish: thread=" << QThread::currentThreadId() << "rays=" << rays;
         }
-    } diagnostic(qEnvironmentVariableIntValue("TONATIUHPP_TRACE_THREAD_DIAGNOSTICS") > 0, nRays);
+    } diagnostic(m_diagnostics != nullptr, nRays, m_diagnostics);
 
     if (m_sunCells.empty()) return;
     if (m_exportFailed && m_exportFailed->load())
         return;
 
     RandomParallel rand(m_rand, m_mutexRand);
+    struct RandomDiagnostic
+    {
+        RandomParallel* random;
+
+        ~RandomDiagnostic()
+        {
+            if (aggregate)
+                aggregate->recordRandomStats(random->refillCount(), random->mutexWaitNanoseconds(), random->refillNanoseconds());
+        }
+        RayTraceDiagnostics* aggregate;
+    } randomDiagnostic{&rand, m_diagnostics};
     const bool recordPhotons = m_photonBuffer && m_mutexPhotonsBuffer;
     if (!recordPhotons) {
         for (ulong n = 0; n < nRays; ++n) {

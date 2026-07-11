@@ -6,8 +6,11 @@
 #include <vector>
 
 #include <QVector>
+#include <QElapsedTimer>
 #include <QMap>
+#include <QMutex>
 #include <QPair>
+#include <QSet>
 #include <QObject>
 
 #include "libraries/math/3D/Transform.h"
@@ -32,6 +35,29 @@ struct TONATIUH_KERNEL RayTracerHit
     bool isFront = false;
 };
 
+struct TONATIUH_KERNEL RayTraceDiagnostics
+{
+    void start();
+    void partitionStarted();
+    void partitionFinished();
+    void recordRandomStats(quint64 refillCount, qint64 mutexWaitNanoseconds, qint64 refillNanoseconds);
+    int distinctWorkerThreadCount() const;
+    qint64 wallNanoseconds() const;
+
+    std::atomic<quint64> totalRefillCount{0};
+    std::atomic<qint64> summedMutexWaitNanoseconds{0};
+    std::atomic<qint64> maximumPartitionMutexWaitNanoseconds{0};
+    std::atomic<qint64> summedRefillNanoseconds{0};
+    std::atomic<qint64> maximumPartitionRefillNanoseconds{0};
+    std::atomic<int> activePartitions{0};
+    std::atomic<int> maximumActivePartitions{0};
+
+private:
+    mutable QMutex m_workerThreadsMutex;
+    QSet<quintptr> m_workerThreads;
+    QElapsedTimer m_wallTimer;
+};
+
 class TONATIUH_KERNEL RayTracer
 {
 
@@ -49,7 +75,8 @@ public:
               QMutex* mutexPhotons,
               QVector<InstanceNode*> exportSuraceList,
               std::atomic_bool* exportFailed = nullptr,
-              HitCallback hitCallback = HitCallback());
+              HitCallback hitCallback = HitCallback(),
+              RayTraceDiagnostics* diagnostics = nullptr);
 
     typedef void result_type;
 
@@ -70,6 +97,7 @@ private:
     QMutex* m_mutexPhotonsBuffer;
     std::atomic_bool* m_exportFailed;
     HitCallback m_hitCallback;
+    RayTraceDiagnostics* m_diagnostics;
     QVector<InstanceNode*> m_exportSurfaceList;
 
     const std::vector< QPair<int, int> >&  m_sunCells;

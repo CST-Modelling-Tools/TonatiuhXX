@@ -208,9 +208,12 @@ RayTraceExecution RayTraceExecutor::start(ulong rays,
     }
 
     m_exportFailed.store(false);
+    m_diagnostics.reset();
     try {
         m_rayPartitions = guiRaysPerThread(rays);
         if (qEnvironmentVariableIntValue("TONATIUHPP_TRACE_THREAD_DIAGNOSTICS") > 0) {
+            m_diagnostics = std::make_shared<RayTraceDiagnostics>();
+            m_diagnostics->start();
             int nonzeroPartitions = 0;
             for (ulong partitionRays : std::as_const(m_rayPartitions)) {
                 if (partitionRays > 0)
@@ -235,7 +238,8 @@ RayTraceExecution RayTraceExecutor::start(ulong rays,
                       photonBuffer ? &m_photonBufferMutex : nullptr,
                       exportSurfaceList,
                       &m_exportFailed,
-                      hitCallback)
+                      hitCallback,
+                      m_diagnostics.get())
         );
         if (!execution.future.isValid()) {
             execution.errorMessage = "Could not start ray tracing because QtConcurrent returned an invalid future.";
@@ -270,6 +274,18 @@ bool RayTraceExecutor::waitForFinished(RayTraceExecution* execution, QString* er
 
     try {
         execution->future.waitForFinished();
+        if (m_diagnostics) {
+            qInfo().nospace()
+                << "RayTraceExecutor aggregate diagnostics: total_rng_refills=" << m_diagnostics->totalRefillCount.load()
+                << ", summed_rng_mutex_wait_ms=" << m_diagnostics->summedMutexWaitNanoseconds.load() / 1.e6
+                << ", maximum_partition_rng_mutex_wait_ms=" << m_diagnostics->maximumPartitionMutexWaitNanoseconds.load() / 1.e6
+                << ", summed_rng_refill_generation_ms=" << m_diagnostics->summedRefillNanoseconds.load() / 1.e6
+                << ", maximum_partition_rng_refill_generation_ms=" << m_diagnostics->maximumPartitionRefillNanoseconds.load() / 1.e6
+                << ", tracing_wall_ms=" << m_diagnostics->wallNanoseconds() / 1.e6
+                << ", distinct_worker_threads=" << m_diagnostics->distinctWorkerThreadCount()
+                << ", maximum_active_partitions=" << m_diagnostics->maximumActivePartitions.load();
+            m_diagnostics.reset();
+        }
         execution->started = false;
         execution->owner = nullptr;
         return true;

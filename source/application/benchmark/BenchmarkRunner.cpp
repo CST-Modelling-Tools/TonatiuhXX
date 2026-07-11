@@ -10,6 +10,7 @@
 #include <vector>
 
 #include <QCryptographicHash>
+#include <QDebug>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -462,6 +463,11 @@ public:
         ++m_totalHits;
     }
 
+    void onHitMinimal()
+    {
+        ++m_totalHits;
+    }
+
     void merge(const BenchmarkAccumulator& other)
     {
         for (size_t index = 0; index < m_hits.size(); ++index)
@@ -527,14 +533,16 @@ private:
 
 struct BenchmarkHitState
 {
-    explicit BenchmarkHitState(std::vector<BenchmarkAccumulator>* accumulators):
+    explicit BenchmarkHitState(std::vector<BenchmarkAccumulator>* accumulators, bool minimalCollection):
         accumulators(accumulators),
-        generation(nextBenchmarkRunGeneration.fetch_add(1))
+        generation(nextBenchmarkRunGeneration.fetch_add(1)),
+        minimalCollection(minimalCollection)
     {
     }
 
     std::vector<BenchmarkAccumulator>* accumulators = nullptr;
     const quint64 generation;
+    const bool minimalCollection;
     std::atomic<int> nextAccumulator{0};
 };
 
@@ -571,7 +579,11 @@ public:
         if (cache.accumulatorIndex < 0 || static_cast<size_t>(cache.accumulatorIndex) >= m_state->accumulators->size())
             return;
 
-        (*m_state->accumulators)[static_cast<size_t>(cache.accumulatorIndex)].onHit(hit);
+        BenchmarkAccumulator& accumulator = (*m_state->accumulators)[static_cast<size_t>(cache.accumulatorIndex)];
+        if (m_state->minimalCollection)
+            accumulator.onHitMinimal();
+        else
+            accumulator.onHit(hit);
     }
 
 private:
@@ -822,9 +834,20 @@ int BenchmarkRunner::run(const QString& configFileName, TSceneKit* scene, QStrin
     RayTraceExecutorResult traceResult;
     RayTraceExecutor executor;
     QString traceError;
-    const std::shared_ptr<BenchmarkHitState> hitState = std::make_shared<BenchmarkHitState>(&threadAccumulators);
+    const int diagnosticMode = qEnvironmentVariableIntValue("TONATIUHPP_TRACE_THREAD_DIAGNOSTICS");
+    const bool minimalCollection = diagnosticMode == 2;
+    const bool nullCollection = diagnosticMode >= 3;
+    if (minimalCollection)
+        qInfo() << "Benchmark diagnostics: minimal thread-local hit collection enabled; benchmark results are diagnostic-only.";
+    else if (nullCollection)
+        qInfo() << "Benchmark diagnostics: hit collection bypassed; benchmark results are diagnostic-only.";
+
+    const std::shared_ptr<BenchmarkHitState> hitState = std::make_shared<BenchmarkHitState>(&threadAccumulators, minimalCollection);
     const BenchmarkHitCallback hitCallback(hitState);
-    if (!executor.trace(scene, options, &traceResult, &traceError, TextProgressReporter(&out), hitCallback)) {
+    const RayTraceExecutor::HitCallback traceHitCallback = nullCollection
+        ? RayTraceExecutor::HitCallback()
+        : RayTraceExecutor::HitCallback(hitCallback);
+    if (!executor.trace(scene, options, &traceResult, &traceError, TextProgressReporter(&out), traceHitCallback)) {
         return fail(errorMessage, QString("Benchmark trace failed: %1").arg(traceError)), 1;
     }
     if (!std::isfinite(traceResult.powerPerRay) || traceResult.powerPerRay < 0.)

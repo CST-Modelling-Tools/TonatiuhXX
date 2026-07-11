@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <atomic>
+#include <memory>
 #include <utility>
 
 #include <QFuture>
@@ -19,6 +20,7 @@ class SunShape;
 class TSceneKit;
 class RayTraceExecutor;
 struct RayTracerHit;
+struct RayTraceDiagnostics;
 
 struct RayTraceExecutorOptions
 {
@@ -111,4 +113,5 @@ private:
     std::atomic_bool m_active{false};
     std::atomic_bool m_exportFailed{false};
     QVector<ulong> m_rayPartitions;
+    std::shared_ptr<RayTraceDiagnostics> m_diagnostics;
 };
