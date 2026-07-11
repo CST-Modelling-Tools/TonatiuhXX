@@ -1,4 +1,6 @@
 #include <QPoint>
+#include <QDebug>
+#include <QThread>
 
 #include "shape/DifferentialGeometry.h"
 #include "random/RandomParallel.h"
@@ -43,6 +45,26 @@ RayTracer::RayTracer(InstanceNode* instanceRoot,
 
 void RayTracer::operator()(ulong nRays)
 {
+    struct PartitionDiagnostic
+    {
+        bool enabled;
+        ulong rays;
+
+        PartitionDiagnostic(bool enabled, ulong rays):
+            enabled(enabled),
+            rays(rays)
+        {
+            if (enabled)
+                qInfo() << "RayTraceExecutor partition start: thread=" << QThread::currentThreadId() << "rays=" << rays;
+        }
+
+        ~PartitionDiagnostic()
+        {
+            if (enabled)
+                qInfo() << "RayTraceExecutor partition finish: thread=" << QThread::currentThreadId() << "rays=" << rays;
+        }
+    } diagnostic(qEnvironmentVariableIntValue("TONATIUHPP_TRACE_THREAD_DIAGNOSTICS") > 0, nRays);
+
     if (m_sunCells.empty()) return;
     if (m_exportFailed && m_exportFailed->load())
         return;

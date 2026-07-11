@@ -19,17 +19,10 @@
 #include <QSaveFile>
 #include <QStringList>
 #include <QTextStream>
-<<<<<<< HEAD
 #include <QThreadPool>
 #include <QtEndian>
 
 #include "core/RayTraceExecutor.h"
-=======
-#include <QThread>
-#include <QtEndian>
-
-#include "core/RayTraceRunner.h"
->>>>>>> 1e6db44cd54ba60e1da4049bfc1f6c0ac60a5793
 #include "kernel/run/RayTracer.h"
 #include "libraries/math/gcf.h"
 
@@ -814,7 +807,6 @@ int BenchmarkRunner::run(const QString& configFileName, TSceneKit* scene, QStrin
     if (!fluxGridBinaryOutputFileName.isEmpty())
         out << "flux_grid_binary_output_file: " << fluxGridBinaryOutputFileName << Qt::endl;
 
-<<<<<<< HEAD
     RayTraceExecutorOptions options;
     options.rays = config.rays;
     options.seed = config.seed;
@@ -833,44 +825,14 @@ int BenchmarkRunner::run(const QString& configFileName, TSceneKit* scene, QStrin
     const std::shared_ptr<BenchmarkHitState> hitState = std::make_shared<BenchmarkHitState>(&threadAccumulators);
     const BenchmarkHitCallback hitCallback(hitState);
     if (!executor.trace(scene, options, &traceResult, &traceError, TextProgressReporter(&out), hitCallback)) {
-=======
-    RayTraceOptions options;
-    options.rays = config.rays;
-    options.seed = config.seed;
-    options.sunWidthDivisions = 100;
-    options.sunHeightDivisions = 100;
-    options.workerCount = config.workerCount > 0 ? config.workerCount : qMax(1, QThread::idealThreadCount());
-    options.chunkSize = config.chunkSize > 0 ? config.chunkSize : 10000;
-
-    std::vector<BenchmarkAccumulator> workerAccumulators;
-    workerAccumulators.reserve(static_cast<size_t>(options.workerCount));
-    for (int worker = 0; worker < options.workerCount; ++worker)
-        workerAccumulators.emplace_back(config);
-
-    RayTraceResult traceResult;
-    RayTraceRunner runner;
-    QString traceError;
-    if (!runner.trace(scene, options, &traceResult, &traceError, [&out](const QString& message) {
-            out << message << Qt::endl;
-        }, RayTraceRunner::HitCallback(), [&workerAccumulators](int workerIndex) {
-            return [&workerAccumulators, workerIndex](const RayTracerHit& hit) {
-                workerAccumulators[static_cast<size_t>(workerIndex)].onHit(hit);
-            };
-        })) {
->>>>>>> 1e6db44cd54ba60e1da4049bfc1f6c0ac60a5793
         return fail(errorMessage, QString("Benchmark trace failed: %1").arg(traceError)), 1;
     }
     if (!std::isfinite(traceResult.powerPerRay) || traceResult.powerPerRay < 0.)
         return fail(errorMessage, "Benchmark trace produced invalid power-per-ray."), 1;
 
     BenchmarkAccumulator accumulator(config);
-<<<<<<< HEAD
     for (const BenchmarkAccumulator& threadAccumulator : threadAccumulators)
         accumulator.merge(threadAccumulator);
-=======
-    for (const BenchmarkAccumulator& workerAccumulator : workerAccumulators)
-        accumulator.merge(workerAccumulator);
->>>>>>> 1e6db44cd54ba60e1da4049bfc1f6c0ac60a5793
 
     const BenchmarkMetrics metrics = accumulator.metrics(traceResult.powerPerRay);
     if (!std::isfinite(metrics.totalPowerMw) ||

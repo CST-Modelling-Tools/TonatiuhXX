@@ -4,9 +4,11 @@
 #include <exception>
 
 #include <QElapsedTimer>
+#include <QDebug>
 #include <QFuture>
 #include <QMutex>
 #include <QThread>
+#include <QThreadPool>
 #include <QtConcurrentMap>
 
 #include "core/SceneInstanceBuilder.h"
@@ -208,6 +210,18 @@ RayTraceExecution RayTraceExecutor::start(ulong rays,
     m_exportFailed.store(false);
     try {
         m_rayPartitions = guiRaysPerThread(rays);
+        if (qEnvironmentVariableIntValue("TONATIUHPP_TRACE_THREAD_DIAGNOSTICS") > 0) {
+            int nonzeroPartitions = 0;
+            for (ulong partitionRays : std::as_const(m_rayPartitions)) {
+                if (partitionRays > 0)
+                    ++nonzeroPartitions;
+            }
+            qInfo().nospace()
+                << "RayTraceExecutor diagnostics: partitions=" << m_rayPartitions.size()
+                << ", nonzero_partitions=" << nonzeroPartitions
+                << ", global_pool_max_threads=" << QThreadPool::globalInstance()->maxThreadCount()
+                << ", ideal_threads=" << QThread::idealThreadCount();
+        }
         execution.future = QtConcurrent::map(
             m_rayPartitions,
             RayTracer(instanceLayout,
