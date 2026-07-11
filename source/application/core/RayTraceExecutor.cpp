@@ -1,6 +1,7 @@
 #include "RayTraceExecutor.h"
 
 #include <memory>
+#include <exception>
 
 #include <QElapsedTimer>
 #include <QFuture>
@@ -158,10 +159,13 @@ bool RayTraceExecutor::trace(TSceneKit* scene,
     }
 
     reportProgress(progress, "Starting ray loop.");
-    QFuture<void> future = start(options.rays, instanceLayout, &instanceSun, sunAperture, sunShape,
-                                 tracingAir, &random, photonBuffer, exportSurfaceList,
-                                 hitCallback);
-    future.waitForFinished();
+    RayTraceExecution execution = start(options.rays, instanceLayout, &instanceSun, sunAperture, sunShape,
+                                        tracingAir, &random, photonBuffer, exportSurfaceList,
+                                        hitCallback);
+    if (!execution.started)
+        return fail(errorMessage, execution.errorMessage);
+    if (!waitForFinished(&execution, errorMessage))
+        return false;
 
     const double powerPerRay = result ? result->powerPerRay : (sunAperture->getArea() * sunPosition->irradiance.getValue() / options.rays);
     if (localPhotonBuffer && !localPhotonBuffer->endExport(powerPerRay))
@@ -183,32 +187,86 @@ bool RayTraceExecutor::trace(TSceneKit* scene,
     return true;
 }
 
-QFuture<void> RayTraceExecutor::start(ulong rays,
-                                      InstanceNode* instanceLayout,
-                                      InstanceNode* instanceSun,
-                                      SunAperture* sunAperture,
-                                      SunShape* sunShape,
-                                      AirTransmission* air,
-                                      Random* random,
-                                      PhotonsBuffer* photonBuffer,
-                                      const QVector<InstanceNode*>& exportSurfaceList,
-                                      const HitCallback& hitCallback)
+RayTraceExecution RayTraceExecutor::start(ulong rays,
+                                          InstanceNode* instanceLayout,
+                                          InstanceNode* instanceSun,
+                                          SunAperture* sunAperture,
+                                          SunShape* sunShape,
+                                          AirTransmission* air,
+                                          Random* random,
+                                          PhotonsBuffer* photonBuffer,
+                                          const QVector<InstanceNode*>& exportSurfaceList,
+                                          const HitCallback& hitCallback)
 {
+    RayTraceExecution execution;
+    bool expected = false;
+    if (!m_active.compare_exchange_strong(expected, true)) {
+        execution.errorMessage = "RayTraceExecutor already has an active execution.";
+        return execution;
+    }
+
     m_exportFailed.store(false);
-    m_rayPartitions = guiRaysPerThread(rays);
-    return QtConcurrent::map(
-        m_rayPartitions,
-        RayTracer(instanceLayout,
-                  instanceSun,
-                  sunAperture,
-                  sunShape,
-                  air,
-                  random,
-                  &m_randomMutex,
-                  photonBuffer,
-                  photonBuffer ? &m_photonBufferMutex : nullptr,
-                  exportSurfaceList,
-                  &m_exportFailed,
-                  hitCallback)
-    );
+    try {
+        m_rayPartitions = guiRaysPerThread(rays);
+        execution.future = QtConcurrent::map(
+            m_rayPartitions,
+            RayTracer(instanceLayout,
+                      instanceSun,
+                      sunAperture,
+                      sunShape,
+                      air,
+                      random,
+                      &m_randomMutex,
+                      photonBuffer,
+                      photonBuffer ? &m_photonBufferMutex : nullptr,
+                      exportSurfaceList,
+                      &m_exportFailed,
+                      hitCallback)
+        );
+        if (!execution.future.isValid()) {
+            execution.errorMessage = "Could not start ray tracing because QtConcurrent returned an invalid future.";
+            m_active.store(false);
+            return execution;
+        }
+        execution.started = true;
+        execution.owner = this;
+    } catch (const std::exception& error) {
+        execution.errorMessage = QString("Could not start ray tracing: %1").arg(error.what());
+        m_active.store(false);
+    } catch (...) {
+        execution.errorMessage = "Could not start ray tracing because an unknown exception was raised.";
+        m_active.store(false);
+    }
+    return execution;
+}
+
+bool RayTraceExecutor::waitForFinished(RayTraceExecution* execution, QString* errorMessage) noexcept
+{
+    if (!execution || !execution->started || execution->owner != this) {
+        if (errorMessage)
+            *errorMessage = "Ray-trace execution was not started.";
+        return false;
+    }
+
+    struct ActiveRunReset
+    {
+        std::atomic_bool* active;
+        ~ActiveRunReset() { active->store(false); }
+    } reset{&m_active};
+
+    try {
+        execution->future.waitForFinished();
+        execution->started = false;
+        execution->owner = nullptr;
+        return true;
+    } catch (const std::exception& error) {
+        if (errorMessage)
+            *errorMessage = QString("Ray tracing worker failed: %1").arg(error.what());
+    } catch (...) {
+        if (errorMessage)
+            *errorMessage = "Ray tracing worker failed with an unknown exception.";
+    }
+    execution->started = false;
+    execution->owner = nullptr;
+    return false;
 }

@@ -32,6 +32,7 @@ constexpr double kBenchmarkV1ReceiverZ = 80.;
 constexpr double kBenchmarkV1TiltDegrees = 210.515 - 180.;
 constexpr double kMegawatt = 1.e6;
 constexpr size_t kMaxGridCells = 10000000;
+std::atomic<quint64> nextBenchmarkRunGeneration{1};
 
 struct Bounds
 {
@@ -527,12 +528,21 @@ private:
 struct BenchmarkHitState
 {
     explicit BenchmarkHitState(std::vector<BenchmarkAccumulator>* accumulators):
-        accumulators(accumulators)
+        accumulators(accumulators),
+        generation(nextBenchmarkRunGeneration.fetch_add(1))
     {
     }
 
     std::vector<BenchmarkAccumulator>* accumulators = nullptr;
+    const quint64 generation;
     std::atomic<int> nextAccumulator{0};
+};
+
+struct ThreadLocalBenchmarkCache
+{
+    const BenchmarkHitState* state = nullptr;
+    quint64 generation = 0;
+    int accumulatorIndex = -1;
 };
 
 class BenchmarkHitCallback
@@ -550,18 +560,18 @@ public:
         if (!m_state || !m_state->accumulators || m_state->accumulators->empty())
             return;
 
-        static thread_local const BenchmarkHitState* currentState = nullptr;
-        static thread_local int accumulatorIndex = -1;
+        static thread_local ThreadLocalBenchmarkCache cache;
 
-        if (currentState != m_state.get()) {
-            currentState = m_state.get();
-            accumulatorIndex = m_state->nextAccumulator.fetch_add(1);
+        if (cache.state != m_state.get() || cache.generation != m_state->generation) {
+            cache.state = m_state.get();
+            cache.generation = m_state->generation;
+            cache.accumulatorIndex = m_state->nextAccumulator.fetch_add(1);
         }
 
-        if (accumulatorIndex < 0 || static_cast<size_t>(accumulatorIndex) >= m_state->accumulators->size())
+        if (cache.accumulatorIndex < 0 || static_cast<size_t>(cache.accumulatorIndex) >= m_state->accumulators->size())
             return;
 
-        (*m_state->accumulators)[static_cast<size_t>(accumulatorIndex)].onHit(hit);
+        (*m_state->accumulators)[static_cast<size_t>(cache.accumulatorIndex)].onHit(hit);
     }
 
 private:

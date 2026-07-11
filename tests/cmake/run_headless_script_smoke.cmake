@@ -71,6 +71,10 @@ var benchmarkExitCode = tn.runBenchmark(\"${_benchmark_config_file}\");
 if (benchmarkExitCode !== 0) {
   throw new Error(\"tn.runBenchmark returned \" + benchmarkExitCode);
 }
+var repeatedBenchmarkExitCode = tn.runBenchmark(\"${_benchmark_config_file}\");
+if (repeatedBenchmarkExitCode !== 0) {
+  throw new Error(\"second tn.runBenchmark returned \" + repeatedBenchmarkExitCode);
+}
 
 tn.writeJson(\"${_script_output_file}\", {
   schema: \"tonatiuhpp.headless.result\",
@@ -87,7 +91,8 @@ tn.writeJson(\"${_script_output_file}\", {
   benchmark: {
     config_file: \"${_benchmark_config_file}\",
     result_file: \"${_benchmark_output_file}\",
-    exit_code: benchmarkExitCode
+    exit_code: benchmarkExitCode,
+    repeated_exit_code: repeatedBenchmarkExitCode
   }
 });
 ")
@@ -155,7 +160,8 @@ foreach(_key
     "benchmark"
     "config_file"
     "result_file"
-    "exit_code")
+    "exit_code"
+    "repeated_exit_code")
   if(NOT _script_json MATCHES "\"${_key}\"")
     message(STATUS "script JSON:\n${_script_json}")
     message(FATAL_ERROR "Headless run-script JSON did not contain key: ${_key}")

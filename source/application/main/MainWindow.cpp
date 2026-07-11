@@ -2012,19 +2012,26 @@ void MainWindow::Run()
     connect(&watcher, SIGNAL(progressValueChanged(int)), &dialog, SLOT(setValue(int)));
 
     std::cout << "QtConcurrent started: " << timer.elapsed() << std::endl;
-    QFuture<void> photonMap;
     AirTransmission* airTemp = 0;
     if (air->getTypeId() != AirVacuum::getClassTypeId())
         airTemp = air;
 
     RayTraceExecutor executor;
-    photonMap = executor.start(m_raysNumber, instanceLayout, &instanceSun,
-                               sunAperture, sunShape, airTemp, m_rand,
-                               m_photonsBuffer, exportSurfaceList);
-    watcher.setFuture(photonMap);
+    RayTraceExecution execution = executor.start(m_raysNumber, instanceLayout, &instanceSun,
+                                                 sunAperture, sunShape, airTemp, m_rand,
+                                                 m_photonsBuffer, exportSurfaceList);
+    if (!execution.started) {
+        QMessageBox::warning(this, "Tonatiuh", execution.errorMessage);
+        return;
+    }
+    watcher.setFuture(execution.future);
 
     dialog.exec();
-    watcher.waitForFinished();
+    QString executionError;
+    if (!executor.waitForFinished(&execution, &executionError)) {
+        QMessageBox::warning(this, "Tonatiuh", executionError);
+        return;
+    }
     std::cout << "QtConcurrent finished: " << timer.elapsed() << std::endl;
 
     bool tracingCancelledByExport = executor.exportFailed();

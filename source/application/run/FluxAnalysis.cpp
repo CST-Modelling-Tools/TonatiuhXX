@@ -5,6 +5,7 @@
 
 #include <QFileDialog>
 #include <QFutureWatcher>
+#include <QDebug>
 #include <QPair>
 #include <QProgressDialog>
 
@@ -164,17 +165,20 @@ void FluxAnalysis::run(QString nodeURL, QString surfaceSide, ulong nRays, bool p
     QObject::connect(&watcher, SIGNAL(progressValueChanged(int)), this, SLOT(processEvents()));
     QObject::connect(this, SIGNAL(stopSignal()), &watcher, SLOT(cancel()));
 
-    QFuture<void> photonMap;
     AirTransmission* airTemp = 0;
     if (air->getTypeId() != AirTransmission::getClassTypeId())
         airTemp = air;
 
     RayTraceExecutor executor;
-    photonMap = executor.start(nRays, m_instanceLayout, &instanceSun,
-                               sunAperture, sunShape, airTemp, m_rand,
-                               m_photons, exportSuraceList);
+    RayTraceExecution execution = executor.start(nRays, m_instanceLayout, &instanceSun,
+                                                 sunAperture, sunShape, airTemp, m_rand,
+                                                 m_photons, exportSuraceList);
+    if (!execution.started) {
+        qWarning() << execution.errorMessage;
+        return;
+    }
 
-    watcher.setFuture(photonMap);
+    watcher.setFuture(execution.future);
 
     // Display the dialog and start the event loop.
 //    if (!silent) {
@@ -183,7 +187,11 @@ void FluxAnalysis::run(QString nodeURL, QString surfaceSide, ulong nRays, bool p
 
 //    dialog.setModal(false);
 //    dialog.show();
-    watcher.waitForFinished();
+    QString executionError;
+    if (!executor.waitForFinished(&execution, &executionError)) {
+        qWarning() << executionError;
+        return;
+    }
 
     m_tracedRays += nRays;
 

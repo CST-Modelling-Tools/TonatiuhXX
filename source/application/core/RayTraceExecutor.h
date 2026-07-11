@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <atomic>
+#include <utility>
 
 #include <QFuture>
 #include <QMutex>
@@ -16,6 +17,7 @@ class AirTransmission;
 class SunAperture;
 class SunShape;
 class TSceneKit;
+class RayTraceExecutor;
 struct RayTracerHit;
 
 struct RayTraceExecutorOptions
@@ -44,6 +46,31 @@ struct RayTraceExecutorResult
     bool exportFailed = false;
 };
 
+struct RayTraceExecution
+{
+    RayTraceExecution() = default;
+    RayTraceExecution(const RayTraceExecution&) = delete;
+    RayTraceExecution& operator=(const RayTraceExecution&) = delete;
+    RayTraceExecution(RayTraceExecution&& other):
+        started(other.started),
+        future(std::move(other.future)),
+        errorMessage(std::move(other.errorMessage)),
+        owner(other.owner)
+    {
+        other.started = false;
+        other.owner = nullptr;
+    }
+    RayTraceExecution& operator=(RayTraceExecution&&) = delete;
+
+    bool started = false;
+    QFuture<void> future;
+    QString errorMessage;
+
+private:
+    const RayTraceExecutor* owner = nullptr;
+    friend class RayTraceExecutor;
+};
+
 class RayTraceExecutor
 {
 public:
@@ -53,16 +80,21 @@ public:
     static QVector<ulong> guiRaysPerThread(ulong rays);
     static qulonglong taskCountForRays(ulong rays);
 
-    QFuture<void> start(ulong rays,
-                        InstanceNode* instanceLayout,
-                        InstanceNode* instanceSun,
-                        SunAperture* sunAperture,
-                        SunShape* sunShape,
-                        AirTransmission* air,
-                        Random* random,
-                        PhotonsBuffer* photonBuffer,
-                        const QVector<InstanceNode*>& exportSurfaceList,
-                        const HitCallback& hitCallback = HitCallback());
+    // One executor instance supports one active execution at a time. Every
+    // successful launch must be completed through waitForFinished().
+    RayTraceExecution start(ulong rays,
+                            InstanceNode* instanceLayout,
+                            InstanceNode* instanceSun,
+                            SunAperture* sunAperture,
+                            SunShape* sunShape,
+                            AirTransmission* air,
+                            Random* random,
+                            PhotonsBuffer* photonBuffer,
+                            const QVector<InstanceNode*>& exportSurfaceList,
+                            const HitCallback& hitCallback = HitCallback());
+
+    bool waitForFinished(RayTraceExecution* execution, QString* errorMessage = nullptr) noexcept;
+    bool isRunning() const { return m_active.load(); }
 
     bool exportFailed() const { return m_exportFailed.load(); }
 
@@ -76,6 +108,7 @@ public:
 private:
     QMutex m_randomMutex;
     QMutex m_photonBufferMutex;
+    std::atomic_bool m_active{false};
     std::atomic_bool m_exportFailed{false};
     QVector<ulong> m_rayPartitions;
 };
