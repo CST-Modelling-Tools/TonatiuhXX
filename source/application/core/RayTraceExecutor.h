@@ -79,6 +79,8 @@ public:
     using ProgressCallback = std::function<void(const QString&)>;
     using HitCallback = std::function<void(const RayTracerHit&)>;
 
+    // Retained for source compatibility; returns the adaptive ray work items
+    // consumed dynamically by the global Qt thread pool.
     static QVector<ulong> guiRaysPerThread(ulong rays);
     static qulonglong taskCountForRays(ulong rays);
 

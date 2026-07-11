@@ -28,7 +28,8 @@
 
 namespace
 {
-constexpr int kGuiProgressPartitions = 100;
+constexpr ulong kMaximumRayWorkItemSize = 100'000;
+constexpr int kTargetWorkItemsPerThread = 8;
 
 bool fail(QString* errorMessage, const QString& message)
 {
@@ -47,15 +48,31 @@ void reportProgress(const RayTraceExecutor::ProgressCallback& progress, const QS
 
 QVector<ulong> RayTraceExecutor::guiRaysPerThread(ulong rays)
 {
-    QVector<ulong> raysPerThread;
-    const ulong raysPerProgressStep = rays / kGuiProgressPartitions;
-    for (int progress = 0; progress < kGuiProgressPartitions; ++progress)
-        raysPerThread << raysPerProgressStep;
+    QVector<ulong> workItems;
+    if (rays == 0)
+        return workItems;
 
-    if (raysPerProgressStep * kGuiProgressPartitions < rays)
-        raysPerThread << rays - raysPerProgressStep * kGuiProgressPartitions;
+    const qulonglong threadCount = static_cast<qulonglong>(qMax(1, QThreadPool::globalInstance()->maxThreadCount()));
+    const qulonglong targetWorkItemCount = threadCount * static_cast<qulonglong>(kTargetWorkItemsPerThread);
+    const qulonglong rayCount = static_cast<qulonglong>(rays);
+    const qulonglong balancedWorkItemSize =
+        rayCount / targetWorkItemCount + (rayCount % targetWorkItemCount != 0 ? 1 : 0);
+    const ulong workItemSize = static_cast<ulong>(qMax<qulonglong>(
+        1,
+        qMin<qulonglong>(kMaximumRayWorkItemSize, balancedWorkItemSize)
+    ));
+    const qulonglong workItemCount =
+        rayCount / workItemSize + (rayCount % workItemSize != 0 ? 1 : 0);
+    workItems.reserve(static_cast<qsizetype>(workItemCount));
 
-    return raysPerThread;
+    ulong remaining = rays;
+    while (remaining > 0) {
+        const ulong currentWorkItemSize = qMin(workItemSize, remaining);
+        workItems << currentWorkItemSize;
+        remaining -= currentWorkItemSize;
+    }
+
+    return workItems;
 }
 
 qulonglong RayTraceExecutor::taskCountForRays(ulong rays)
@@ -150,14 +167,14 @@ bool RayTraceExecutor::trace(TSceneKit* scene,
 
     QVector<InstanceNode*> exportSurfaceList = options.exportSurfaceList;
     RandomSTL random(options.seed);
-    QVector<ulong> raysPerThread = guiRaysPerThread(options.rays);
+    const QVector<ulong> rayWorkItems = guiRaysPerThread(options.rays);
     if (result) {
         result->sunApertureArea = sunAperture->getArea();
         result->irradiance = sunPosition->irradiance.getValue();
         result->powerPerRay = options.rays > 0 ? result->sunApertureArea * result->irradiance / options.rays : 0.;
         result->workerCount = qMax(1, QThread::idealThreadCount());
-        result->chunkSize = raysPerThread.isEmpty() ? 0 : raysPerThread.first();
-        result->chunkCount = static_cast<qulonglong>(raysPerThread.size());
+        result->chunkSize = rayWorkItems.isEmpty() ? 0 : rayWorkItems.first();
+        result->chunkCount = static_cast<qulonglong>(rayWorkItems.size());
     }
 
     reportProgress(progress, "Starting ray loop.");

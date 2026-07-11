@@ -826,7 +826,7 @@ int BenchmarkRunner::run(const QString& configFileName, TSceneKit* scene, QStrin
     std::vector<BenchmarkAccumulator> threadAccumulators;
     const qulonglong taskCount = RayTraceExecutor::taskCountForRays(config.rays);
     const qulonglong poolThreadCount = static_cast<qulonglong>(qMax(1, QThreadPool::globalInstance()->maxThreadCount()));
-    const qulonglong accumulatorCount = qMax(taskCount, poolThreadCount);
+    const qulonglong accumulatorCount = qMax<qulonglong>(1, qMin(taskCount, poolThreadCount));
     threadAccumulators.reserve(static_cast<size_t>(accumulatorCount));
     for (qulonglong index = 0; index < accumulatorCount; ++index)
         threadAccumulators.emplace_back(config);
