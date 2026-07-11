@@ -10,10 +10,15 @@
 #include <QFileInfo>
 #include <QJSEngine>
 #include <QTextStream>
+#include <QThread>
 
 #include "benchmark/BenchmarkRunner.h"
 #include "core/CorePluginRegistry.h"
+<<<<<<< HEAD
 #include "core/RayTraceExecutor.h"
+=======
+#include "core/RayTraceRunner.h"
+>>>>>>> 1e6db44cd54ba60e1da4049bfc1f6c0ac60a5793
 #include "core/SceneLoader.h"
 #include "core/TonatiuhCore.h"
 
@@ -67,7 +72,11 @@ bool readIntegerOption(const QJSValue& value, const QString& name, bool allowZer
     return true;
 }
 
+<<<<<<< HEAD
 QJSValue makeTraceSummary(QJSEngine* engine, const QString& sceneFilePath, ulong rays, ulong seed, const RayTraceExecutorResult& result)
+=======
+QJSValue makeTraceSummary(QJSEngine* engine, const QString& sceneFilePath, ulong rays, ulong seed, const RayTraceResult& result)
+>>>>>>> 1e6db44cd54ba60e1da4049bfc1f6c0ac60a5793
 {
     QJSValue summary = engine->newObject();
     summary.setProperty("scene_file", QJSValue(sceneFilePath));
@@ -239,14 +248,26 @@ QJSValue HeadlessScriptApi::traceScene(const QJSValue& optionsValue)
         return QJSValue();
     }
 
+<<<<<<< HEAD
     RayTraceExecutorOptions options;
+=======
+    RayTraceOptions options;
+>>>>>>> 1e6db44cd54ba60e1da4049bfc1f6c0ac60a5793
     options.rays = rays;
     options.seed = seed;
-    options.recordPhotons = false;
+    options.workerCount = qMax(1, QThread::idealThreadCount());
+    options.chunkSize = 10000;
+    options.outputMode = RayTraceOutputMode::NoOutput;
 
+<<<<<<< HEAD
     RayTraceExecutorResult result;
     RayTraceExecutor executor;
     if (!executor.trace(scene.get(), options, &result, &errorMessage)) {
+=======
+    RayTraceResult result;
+    RayTraceRunner runner;
+    if (!runner.trace(scene.get(), options, &result, &errorMessage)) {
+>>>>>>> 1e6db44cd54ba60e1da4049bfc1f6c0ac60a5793
         recordError(QString("tn.traceScene failed for %1: %2").arg(absoluteFilePath(sceneFileName), errorMessage));
         return QJSValue();
     }

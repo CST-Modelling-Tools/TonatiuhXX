@@ -5,10 +5,15 @@
 #include <QCoreApplication>
 #include <QFileInfo>
 #include <QTextStream>
+#include <QThread>
 
 #include "benchmark/BenchmarkRunner.h"
 #include "core/CorePluginRegistry.h"
+<<<<<<< HEAD
 #include "core/RayTraceExecutor.h"
+=======
+#include "core/RayTraceRunner.h"
+>>>>>>> 1e6db44cd54ba60e1da4049bfc1f6c0ac60a5793
 #include "core/SceneLoader.h"
 #include "core/TonatiuhCore.h"
 #include "headless/HeadlessScriptHost.h"
@@ -122,14 +127,27 @@ int HeadlessCommandRunner::traceScene(const QStringList& args) const
     out << "photon_export: false" << Qt::endl;
     out << "export_path: none" << Qt::endl;
 
+<<<<<<< HEAD
     RayTraceExecutorOptions options;
+=======
+    RayTraceOptions options;
+>>>>>>> 1e6db44cd54ba60e1da4049bfc1f6c0ac60a5793
     options.rays = parsed.rays;
     options.seed = parsed.seed;
-    options.recordPhotons = false;
+    options.workerCount = qMax(1, QThread::idealThreadCount());
+    options.chunkSize = 10000;
 
+<<<<<<< HEAD
     RayTraceExecutorResult result;
     RayTraceExecutor executor;
     if (!executor.trace(scene.get(), options, &result, &errorMessage, TextProgressReporter(&out))) {
+=======
+    RayTraceResult result;
+    RayTraceRunner runner;
+    if (!runner.trace(scene.get(), options, &result, &errorMessage, [&out](const QString& message) {
+            out << message << Qt::endl;
+        })) {
+>>>>>>> 1e6db44cd54ba60e1da4049bfc1f6c0ac60a5793
         err << "Trace failed: " << errorMessage << Qt::endl;
         return 1;
     }
