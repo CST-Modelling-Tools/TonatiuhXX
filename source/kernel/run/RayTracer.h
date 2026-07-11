@@ -37,7 +37,6 @@ class TONATIUH_KERNEL RayTracer
 
 public:
     using HitCallback = std::function<void(const RayTracerHit&)>;
-    using TraceCallback = std::function<void(const char* event, ulong raysCompleted)>;
 
     RayTracer(InstanceNode* instanceRoot,
               InstanceNode* instanceSun,
@@ -50,8 +49,7 @@ public:
               QMutex* mutexPhotons,
               QVector<InstanceNode*> exportSuraceList,
               std::atomic_bool* exportFailed = nullptr,
-              HitCallback hitCallback = HitCallback(),
-              TraceCallback traceCallback = TraceCallback());
+              HitCallback hitCallback = HitCallback());
 
     typedef void result_type;
 
@@ -72,7 +70,6 @@ private:
     QMutex* m_mutexPhotonsBuffer;
     std::atomic_bool* m_exportFailed;
     HitCallback m_hitCallback;
-    TraceCallback m_traceCallback;
     QVector<InstanceNode*> m_exportSurfaceList;
 
     const std::vector< QPair<int, int> >&  m_sunCells;

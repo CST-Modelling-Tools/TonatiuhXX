@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-06-30
+Last updated: 2026-07-11
 
 Purpose: lightweight handoff for current Tonatiuh++ project and release context. Keep stable agent rules in `AGENT.md`; update this file when release context changes.
 
@@ -38,11 +38,11 @@ Purpose: lightweight handoff for current Tonatiuh++ project and release context.
 - Benchmark reference comparison was tested with the same 10,000-ray result as the reference and produced `benchmark_pass: true`, matching flux-grid hash, and zero total-power/maximum-flux error.
 - Headless benchmark stabilization review: added guards for excessive grid allocations, non-finite hit coordinates, invalid power-per-ray values, and non-finite computed metrics before writing benchmark JSON.
 - Medium benchmark determinism was tested on Windows with `benchmark_heliostat_field_v1.tnhpp` at 1,000,000 rays and seed `123456789`: repeated runs produced matching total/minimum/average/maximum flux metrics and matching `flux_grid_sha256` (`d314e2720957ab15e581d29bcc6e868b1005bae5fdcdf15e23c4446bfc501d64`); elapsed time and rays/s varied as expected.
-- Headless trace-scene now uses the shared worker/chunk `RayTraceRunner` path. On Windows with `benchmark_heliostat_field_v1.tnhpp`, 10,000,000 rays and seed `123456789` completed in `15.859000` seconds at `630556.781638` rays/s with `20` workers and `100` chunks of `100000` rays.
-- Headless benchmark and trace-scene now share the same no-export `RayTraceRunner` execution backend. On Windows with the same 10,000,000-ray benchmark config, repeated benchmark runs completed in `15.642000` and `15.863000` seconds and produced matching deterministic metrics and `flux_grid_sha256` (`68e49409216b69410c976cdf27645051532de06b725c46e9fd7d75d1c623c397`).
-- RayTraceRunner GUI-migration foundation: the shared runner now has an explicit output mode, cancellation callback, result flags for cancellation/export failure, rays-traced accounting, and optional prepared photon-buffer/export-surface plumbing. GUI exporter startup, append/non-append lifecycle, retained-photon safeguards, ray display, and `endExport(power)` remain owned by `MainWindow::Run()` until a dedicated GUI migration milestone.
+- Tonatiuh++ now has one supported parallel ray-tracing implementation: the historical GUI QtConcurrent model with 100 fixed progress partitions, the global Qt thread pool, one shared mutex-protected random stream, and serialized photon-buffer access. GUI `MainWindow::Run()`, headless `trace-scene`, benchmark tracing, and `tn.traceScene()` all call the shared QCore-compatible `RayTraceExecutor`.
+- The alternative `RayTraceRunner` std::thread/chunk/per-chunk-RNG model was removed, including configurable worker/chunk scheduling and per-chunk seed derivation. `ParallelRayTraceExecutor` no longer exists as a separate class or backend; its GUI-faithful behavior was consolidated into `RayTraceExecutor` and the duplicate inline GUI scheduler was extracted to the same service.
+- Benchmark `worker_count` and `chunk_size` inputs are no longer supported because they do not control the historical GUI execution model. Configurations containing either field are rejected with a compatibility error; result JSON continues to report the effective Qt thread/partition shape for machine-readable compatibility.
 - Headless benchmark worker/chunk tuning on Windows confirmed that `20` logical workers remain appropriate on the benchmark host and that reducing the default chunk size from `100000` to `10000` improves 100,000,000-ray throughput slightly (`601189` to `609515` rays/s) while preserving deterministic grid hashes for fixed rays, seed, and chunk size.
-- Headless benchmark config now documents optional `worker_count` and `chunk_size` scheduling controls in `docs/benchmark_config_schema_v1.json` and `docs/headless-benchmark.md`; result JSON reports effective `worker_count`, `chunk_count`, and `chunk_size`.
+- Benchmark result JSON reports the effective Qt worker/partition shape through `worker_count`, `chunk_count`, and `chunk_size`; these are result metadata rather than configurable scheduling controls.
 - Headless benchmark reference workflow now supports optional `flux_grid_output_file`, `reference_flux_grid_file`, and reference JSON `flux_grid_file` CSV comparison while preserving the existing little-endian float64 row-major `flux_grid_sha256` hash.
 - Headless benchmark flux-grid references now support raw little-endian float64 row-major binary output/reference files through `flux_grid_binary_output_file`, `reference_flux_grid_binary_file`, and reference JSON `flux_grid_binary_file`; binary references are preferred over CSV when both are supplied.
 - Release documentation for `v0.1.8.20` now covers the headless commands, benchmark JSON schema, CSV/binary flux-grid references, deterministic comparison guidance, and Zenodo benchmark dataset DOI.
@@ -91,7 +91,8 @@ Purpose: lightweight handoff for current Tonatiuh++ project and release context.
 
 - Benchmark v1 is implemented for the configured receiver transform and grid, but the full 500,000,000-ray baseline and authoritative reference JSON still need to be generated and archived.
 - Benchmark result JSON includes elapsed time and rays/s, so whole-file byte-for-byte equality is not expected across repeated runs; deterministic comparison should use metrics and `flux_grid_sha256`.
-- GUI `MainWindow::Run()` still uses its existing QtConcurrent/photon-export orchestration. Migrating it to `RayTraceRunner` remains pending because it must preserve exporter startup, retained-photon safeguards, append/non-append buffer lifecycle, progress-dialog cancellation, `ShowRaysIn3DView()`, and `endExport(power)` semantics. The runner can now accept an already-prepared photon buffer, but it intentionally does not own GUI exporter lifecycle yet.
+- GUI presentation and photon-export lifecycle remain in `MainWindow::Run()`, while its parallel scheduling is provided by the same `RayTraceExecutor` used headlessly. Future tracing work must extend this canonical executor rather than introduce another backend.
+- Benchmark performance, deterministic hashes, reference outputs, and GUI/headless scientific equivalence require external build and runtime validation after the executor consolidation.
 - Headless mode still needs CI-style validation on Linux and macOS before relying on it for cluster workflows.
 - Headless `run-script` is a first milestone for automation only. It does not expose scene mutation, screenshots, GUI-compatible `MainWindow` APIs, photon export, or legacy script UI behavior; `tn.traceScene` requires `noExport: true`.
 - In the Codex shell environment on Windows, direct CMake/Ninja invocations intermittently wedged and left stale generated metadata; prefer VS Code CMake Tools or the user's normal terminal build path for validation unless this is rechecked.
@@ -107,7 +108,7 @@ Purpose: lightweight handoff for current Tonatiuh++ project and release context.
 - Confirm normal GUI startup still behaves as before after the headless entry-point changes.
 - Confirm `tonatiuhpp --headless validate-scene` on representative plugin-based scenes on Linux and macOS.
 - Confirm normal GUI startup still behaves as before after the parallel headless `trace-scene` changes.
-- Migrate GUI `MainWindow::Run()` to a photon-export-aware `RayTraceRunner` path after adding explicit runner support for photon buffers, export-surface filtering, cancellation, retained-photon error propagation, and photon-power finalization.
+- Validate GUI photon export, cancellation, progress, retained-photon handling, ray display, and cumulative power calculation through the shared `RayTraceExecutor`.
 - Confirm normal GUI startup still behaves as before after the headless `benchmark` changes.
 - Confirm positional `.tnhpps` startup opens the GUI script window/editor, loads the script, and does not execute it automatically.
 - Confirm Windows installed `.tnhpp` and `.tnhpps` associations use Tonatiuh++ icons in Explorer and launch the installed executable with the selected file path.

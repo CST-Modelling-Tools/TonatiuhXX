@@ -29,8 +29,7 @@ set(HEADERS
     commands/CmdSetFieldNode.h
     commands/CmdSetFieldText.h
     core/CorePluginRegistry.h
-    core/ParallelRayTraceExecutor.h
-    core/RayTraceRunner.h
+    core/RayTraceExecutor.h
     core/SceneInstanceBuilder.h
     core/SceneLoader.h
     core/TonatiuhCore.h
@@ -108,8 +107,7 @@ set(SOURCES
     commands/CmdSetFieldNode.cpp
     commands/CmdSetFieldText.cpp
     core/CorePluginRegistry.cpp
-    core/ParallelRayTraceExecutor.cpp
-    core/RayTraceRunner.cpp
+    core/RayTraceExecutor.cpp
     core/SceneInstanceBuilder.cpp
     core/SceneLoader.cpp
     core/TonatiuhCore.cpp

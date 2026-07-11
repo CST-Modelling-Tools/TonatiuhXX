@@ -22,7 +22,7 @@
 #include <QThreadPool>
 #include <QtEndian>
 
-#include "core/ParallelRayTraceExecutor.h"
+#include "core/RayTraceExecutor.h"
 #include "kernel/run/RayTracer.h"
 #include "libraries/math/gcf.h"
 
@@ -53,8 +53,6 @@ struct BenchmarkConfig
     QString sceneFile = "benchmark_v1.tnhpp";
     ulong rays = 500000000;
     ulong seed = 123456789;
-    int workerCount = 0;
-    ulong chunkSize = 0;
     int targetSideId = 1;
     Bounds bounds;
     Grid grid;
@@ -213,10 +211,10 @@ bool parseConfig(const QString& configFileName, BenchmarkConfig* config, QString
         return false;
     if (!parseULong(object, "seed", false, &parsed.seed, errorMessage))
         return false;
-    if (!parsePositiveInt(object, "worker_count", &parsed.workerCount, errorMessage))
-        return false;
-    if (!parseULong(object, "chunk_size", true, &parsed.chunkSize, errorMessage))
-        return false;
+    if (object.contains("worker_count"))
+        return fail(errorMessage, "worker_count is no longer supported; ray tracing uses the canonical GUI global Qt thread pool.");
+    if (object.contains("chunk_size"))
+        return fail(errorMessage, "chunk_size is no longer supported; ray tracing uses the canonical GUI 100-partition decomposition.");
     if (object.contains("target_side_id")) {
         if (!object.value("target_side_id").isDouble())
             return fail(errorMessage, "target_side_id must be 0 or 1.");
@@ -799,24 +797,20 @@ int BenchmarkRunner::run(const QString& configFileName, TSceneKit* scene, QStrin
     if (!fluxGridBinaryOutputFileName.isEmpty())
         out << "flux_grid_binary_output_file: " << fluxGridBinaryOutputFileName << Qt::endl;
 
-    ParallelRayTraceOptions options;
+    RayTraceExecutorOptions options;
     options.rays = config.rays;
     options.seed = config.seed;
     options.recordPhotons = false;
-    options.diagnosticOutput = true;
-    options.requestedWorkerCount = config.workerCount;
-    Q_UNUSED(config.chunkSize)
-
     std::vector<BenchmarkAccumulator> threadAccumulators;
-    const qulonglong taskCount = ParallelRayTraceExecutor::taskCountForRays(config.rays);
+    const qulonglong taskCount = RayTraceExecutor::taskCountForRays(config.rays);
     const qulonglong poolThreadCount = static_cast<qulonglong>(qMax(1, QThreadPool::globalInstance()->maxThreadCount()));
     const qulonglong accumulatorCount = qMax(taskCount, poolThreadCount);
     threadAccumulators.reserve(static_cast<size_t>(accumulatorCount));
     for (qulonglong index = 0; index < accumulatorCount; ++index)
         threadAccumulators.emplace_back(config);
 
-    ParallelRayTraceResult traceResult;
-    ParallelRayTraceExecutor executor;
+    RayTraceExecutorResult traceResult;
+    RayTraceExecutor executor;
     QString traceError;
     const std::shared_ptr<BenchmarkHitState> hitState = std::make_shared<BenchmarkHitState>(&threadAccumulators);
     const BenchmarkHitCallback hitCallback(hitState);

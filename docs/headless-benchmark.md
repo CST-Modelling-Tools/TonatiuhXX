@@ -44,7 +44,7 @@ tn.traceScene({ scene, rays, seed, noExport: true })
 
 `tonatiuh` is also available as an alias for the same limited object. GUI-only APIs such as screenshot capture, scene-tree editing, dialogs, widget access, or GUI-compatible `MainWindow` methods are not available in headless scripts. Unknown or GUI-only API calls fail with a script error instead of being silently ignored.
 
-`tn.traceScene` uses the same QCoreApplication-compatible `ParallelRayTraceExecutor` path as the headless `trace-scene` command. The executor preserves the GUI `MainWindow::Run()` parallel tracing model without creating GUI widgets. It supports no-export tracing only:
+`tn.traceScene` uses the same QCoreApplication-compatible `RayTraceExecutor` as the GUI and the headless `trace-scene` command. It supports no-export tracing only:
 
 - `scene`: required `.tnhpp` scene path
 - `rays`: required positive integer
@@ -142,14 +142,9 @@ https://doi.org/10.5281/zenodo.20395328
 
 Use the dataset scene, config, reference JSON, and flux-grid reference files when reproducing the published benchmark baseline.
 
-## Scheduling Fields
+## Scheduling
 
-`worker_count` and `chunk_size` are retained for compatibility with benchmark configs written for the earlier worker/chunk runner. The GUI-equivalent executor now uses the same QtConcurrent scheduling model as `MainWindow::Run()`: 100 `raysPerThread` partitions plus one remainder partition when needed, one shared random stream behind `RandomParallel`, and the QtConcurrent global thread pool.
-
-| Field | Type | Default | Notes |
-| --- | --- | --- | --- |
-| `worker_count` | positive integer | compatibility only | Parsed for older configs; the effective result field reports `QThread::idealThreadCount()`, matching the GUI progress dialog label. |
-| `chunk_size` | positive integer | compatibility only | Parsed for older configs; the effective result field reports the GUI `rays / 100` partition size, and `chunk_count` reports the number of GUI partitions. |
+GUI and headless tracing use the same `RayTraceExecutor`: 100 `raysPerThread` partitions plus one remainder partition when needed, one shared random stream behind `RandomParallel`, and the QtConcurrent global thread pool. Benchmark configuration fields `worker_count` and `chunk_size` are no longer supported and are rejected with a compatibility error because they cannot control this historical GUI execution model.
 
 The headless trace path now intentionally follows GUI scheduling rather than the previous deterministic per-chunk seed strategy. Whole-run timing and `flux_grid_sha256` should be treated as validation artifacts for a specific executable and platform, not as a guarantee across different scheduling environments.
 

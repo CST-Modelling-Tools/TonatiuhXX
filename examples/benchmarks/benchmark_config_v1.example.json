@@ -3,8 +3,6 @@
   "scene_file": "benchmark_v1.tnhpp",
   "rays": 500000000,
   "seed": 123456789,
-  "worker_count": 20,
-  "chunk_size": 10000,
   "target_side_id": 1,
   "target_bounds": {
     "x_min": -2.0,

@@ -216,8 +216,6 @@ $BenchmarkJson = @"
   "scene_file": "$SceneJs",
   "rays": 10,
   "seed": 123456789,
-  "worker_count": 1,
-  "chunk_size": 10,
   "target_side_id": 1,
   "target_bounds": {
     "x_min": -2.0,
@@ -307,8 +305,6 @@ cat > "${BENCHMARK_CONFIG}" <<EOF
   "scene_file": "${SCENE}",
   "rays": 10,
   "seed": 123456789,
-  "worker_count": 1,
-  "chunk_size": 10,
   "target_side_id": 1,
   "target_bounds": {
     "x_min": -2.0,
@@ -400,8 +396,6 @@ cat > "${BENCHMARK_CONFIG}" <<EOF
   "scene_file": "${SCENE}",
   "rays": 10,
   "seed": 123456789,
-  "worker_count": 1,
-  "chunk_size": 10,
   "target_side_id": 1,
   "target_bounds": {
     "x_min": -2.0,

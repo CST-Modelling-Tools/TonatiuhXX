@@ -1,7 +1,6 @@
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
 
-#include <atomic>
 #include <iostream>
 
 #include <QCloseEvent>
@@ -11,14 +10,12 @@
 #include <QFuture>
 #include <QFutureWatcher>
 #include <QMessageBox>
-#include <QMutex>
 #include <QPluginLoader>
 #include <QProgressDialog>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QStringList>
 #include <QTimer>
-#include <QtConcurrentMap>
 #include <QTime>
 #include <QUndoStack>
 #include <QUndoView>
@@ -63,6 +60,7 @@
 #include "commands/CmdSetFieldNode.h"
 #include "commands/CmdSetFieldText.h"
 #include "commands/CmdPaste.h"
+#include "core/RayTraceExecutor.h"
 
 #include "PluginManager.h"
 #include "kernel/node/TonatiuhFunctions.h"
@@ -75,7 +73,6 @@
 #include "kernel/photons/PhotonsSettings.h"
 #include "kernel/random/Random.h"
 #include "kernel/run/InstanceNode.h"
-#include "kernel/run/RayTracer.h"
 #include "kernel/profiles/ProfileRT.h"
 #include "kernel/scene/TSceneKit.h"
 #include "kernel/scene/TSeparatorKit.h"
@@ -1999,17 +1996,6 @@ void MainWindow::Run()
         return;
     }
 
-    QVector<long> raysPerThread;
-    int progressMax = 100;
-    ulong t1 = m_raysNumber/progressMax;
-    for (int progress = 0; progress < progressMax; ++progress)
-        raysPerThread << t1;
-
-    if (t1*progressMax < m_raysNumber)
-        raysPerThread << m_raysNumber - t1*progressMax;
-
-
-
     // single thread for gprof
     //        QThreadPool::globalInstance()->setMaxThreadCount(1);
     // change ideal
@@ -2026,26 +2012,22 @@ void MainWindow::Run()
     connect(&watcher, SIGNAL(progressValueChanged(int)), &dialog, SLOT(setValue(int)));
 
     std::cout << "QtConcurrent started: " << timer.elapsed() << std::endl;
-    QMutex mutex;
-    QMutex mutexPhotonMap;
     QFuture<void> photonMap;
-    std::atomic_bool exportFailed(false);
     AirTransmission* airTemp = 0;
     if (air->getTypeId() != AirVacuum::getClassTypeId())
         airTemp = air;
 
-    photonMap = QtConcurrent::map(raysPerThread, RayTracer(instanceLayout,
-                                                           &instanceSun, sunAperture, sunShape, airTemp,
-                                                           m_rand,
-                                                           &mutex, m_photonsBuffer, &mutexPhotonMap,
-                                                           exportSurfaceList, &exportFailed) );
+    RayTraceExecutor executor;
+    photonMap = executor.start(m_raysNumber, instanceLayout, &instanceSun,
+                               sunAperture, sunShape, airTemp, m_rand,
+                               m_photonsBuffer, exportSurfaceList);
     watcher.setFuture(photonMap);
 
     dialog.exec();
     watcher.waitForFinished();
     std::cout << "QtConcurrent finished: " << timer.elapsed() << std::endl;
 
-    bool tracingCancelledByExport = exportFailed.load();
+    bool tracingCancelledByExport = executor.exportFailed();
     if (!tracingCancelledByExport)
         m_raysTracedTotal += m_raysNumber;
 

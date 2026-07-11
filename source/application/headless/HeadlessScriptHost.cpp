@@ -13,7 +13,7 @@
 
 #include "benchmark/BenchmarkRunner.h"
 #include "core/CorePluginRegistry.h"
-#include "core/ParallelRayTraceExecutor.h"
+#include "core/RayTraceExecutor.h"
 #include "core/SceneLoader.h"
 #include "core/TonatiuhCore.h"
 
@@ -67,7 +67,7 @@ bool readIntegerOption(const QJSValue& value, const QString& name, bool allowZer
     return true;
 }
 
-QJSValue makeTraceSummary(QJSEngine* engine, const QString& sceneFilePath, ulong rays, ulong seed, const ParallelRayTraceResult& result)
+QJSValue makeTraceSummary(QJSEngine* engine, const QString& sceneFilePath, ulong rays, ulong seed, const RayTraceExecutorResult& result)
 {
     QJSValue summary = engine->newObject();
     summary.setProperty("scene_file", QJSValue(sceneFilePath));
@@ -239,13 +239,13 @@ QJSValue HeadlessScriptApi::traceScene(const QJSValue& optionsValue)
         return QJSValue();
     }
 
-    ParallelRayTraceOptions options;
+    RayTraceExecutorOptions options;
     options.rays = rays;
     options.seed = seed;
     options.recordPhotons = false;
 
-    ParallelRayTraceResult result;
-    ParallelRayTraceExecutor executor;
+    RayTraceExecutorResult result;
+    RayTraceExecutor executor;
     if (!executor.trace(scene.get(), options, &result, &errorMessage)) {
         recordError(QString("tn.traceScene failed for %1: %2").arg(absoluteFilePath(sceneFileName), errorMessage));
         return QJSValue();

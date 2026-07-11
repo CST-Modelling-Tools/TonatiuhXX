@@ -22,8 +22,6 @@ file(WRITE "${_config_file}" "{
   \"scene_file\": \"${_scene_file}\",
   \"rays\": 10,
   \"seed\": 123456789,
-  \"worker_count\": 1,
-  \"chunk_size\": 10,
   \"target_side_id\": 1,
   \"target_bounds\": {
     \"x_min\": -2.0,

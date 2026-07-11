@@ -5,21 +5,19 @@
 
 #include <QFileDialog>
 #include <QFutureWatcher>
-#include <QMutex>
 #include <QPair>
 #include <QProgressDialog>
-#include <QtConcurrentMap>
 
 #include <Inventor/actions/SoGetBoundingBoxAction.h>
 #include <Inventor/nodes/SoTransform.h>
 #include <Inventor/nodes/SoGroup.h>
 
 #include "tree/SceneTreeModel.h"
+#include "core/RayTraceExecutor.h"
 #include "kernel/air/AirTransmission.h"
 #include "kernel/run/InstanceNode.h"
 #include "kernel/photons/PhotonsBuffer.h"
 #include "kernel/random//Random.h"
-#include "kernel/run/RayTracer.h"
 #include "kernel/scene/TSceneKit.h"
 #include "kernel/scene/TShapeKit.h"
 #include "kernel/shape/ShapeRT.h"
@@ -147,16 +145,6 @@ void FluxAnalysis::run(QString nodeURL, QString surfaceSide, ulong nRays, bool p
 
     if (!sunKit->findTexture(m_sunDivs.x, m_sunDivs.y, m_instanceLayout)) return;
 
-    QVector<long> raysPerThread;
-    int maximumValueProgressScale = 100;
-
-    ulong t1 = nRays / maximumValueProgressScale;
-    for (int progressCount = 0; progressCount < maximumValueProgressScale; ++progressCount)
-        raysPerThread << t1;
-
-    if (t1*maximumValueProgressScale < nRays)
-        raysPerThread << nRays - t1*maximumValueProgressScale;
-
     Transform lightToWorld = tgf::makeTransform(sunTransform);
     instanceSun.setTransform(lightToWorld);
 
@@ -176,18 +164,15 @@ void FluxAnalysis::run(QString nodeURL, QString surfaceSide, ulong nRays, bool p
     QObject::connect(&watcher, SIGNAL(progressValueChanged(int)), this, SLOT(processEvents()));
     QObject::connect(this, SIGNAL(stopSignal()), &watcher, SLOT(cancel()));
 
-    QMutex mutex;
-    QMutex mutexPhotonMap;
     QFuture<void> photonMap;
     AirTransmission* airTemp = 0;
     if (air->getTypeId() != AirTransmission::getClassTypeId())
         airTemp = air;
 
-    photonMap = QtConcurrent::map(raysPerThread, RayTracer(
-        m_instanceLayout,
-        &instanceSun, sunAperture, sunShape, airTemp,
-        m_rand, &mutex, m_photons, &mutexPhotonMap, exportSuraceList
-    ));
+    RayTraceExecutor executor;
+    photonMap = executor.start(nRays, m_instanceLayout, &instanceSun,
+                               sunAperture, sunShape, airTemp, m_rand,
+                               m_photons, exportSuraceList);
 
     watcher.setFuture(photonMap);
 

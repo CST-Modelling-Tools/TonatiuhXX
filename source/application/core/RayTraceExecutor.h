@@ -1,17 +1,24 @@
 #pragma once
 
 #include <functional>
+#include <atomic>
 
+#include <QFuture>
+#include <QMutex>
 #include <QVector>
 #include <QString>
 #include <qglobal.h>
 
 class InstanceNode;
 class PhotonsBuffer;
+class Random;
+class AirTransmission;
+class SunAperture;
+class SunShape;
 class TSceneKit;
 struct RayTracerHit;
 
-struct ParallelRayTraceOptions
+struct RayTraceExecutorOptions
 {
     ulong rays = 0;
     ulong seed = 0;
@@ -21,11 +28,9 @@ struct ParallelRayTraceOptions
     PhotonsBuffer* photonBuffer = nullptr;
     QVector<InstanceNode*> exportSurfaceList;
     bool recordPhotons = true;
-    bool diagnosticOutput = false;
-    int requestedWorkerCount = 0;
 };
 
-struct ParallelRayTraceResult
+struct RayTraceExecutorResult
 {
     double elapsedSeconds = 0.;
     double raysPerSecond = 0.;
@@ -39,7 +44,7 @@ struct ParallelRayTraceResult
     bool exportFailed = false;
 };
 
-class ParallelRayTraceExecutor
+class RayTraceExecutor
 {
 public:
     using ProgressCallback = std::function<void(const QString&)>;
@@ -48,10 +53,29 @@ public:
     static QVector<ulong> guiRaysPerThread(ulong rays);
     static qulonglong taskCountForRays(ulong rays);
 
+    QFuture<void> start(ulong rays,
+                        InstanceNode* instanceLayout,
+                        InstanceNode* instanceSun,
+                        SunAperture* sunAperture,
+                        SunShape* sunShape,
+                        AirTransmission* air,
+                        Random* random,
+                        PhotonsBuffer* photonBuffer,
+                        const QVector<InstanceNode*>& exportSurfaceList,
+                        const HitCallback& hitCallback = HitCallback());
+
+    bool exportFailed() const { return m_exportFailed.load(); }
+
     bool trace(TSceneKit* scene,
-               const ParallelRayTraceOptions& options,
-               ParallelRayTraceResult* result,
+               const RayTraceExecutorOptions& options,
+               RayTraceExecutorResult* result,
                QString* errorMessage,
                const ProgressCallback& progress = ProgressCallback(),
-               const HitCallback& hitCallback = HitCallback()) const;
+               const HitCallback& hitCallback = HitCallback());
+
+private:
+    QMutex m_randomMutex;
+    QMutex m_photonBufferMutex;
+    std::atomic_bool m_exportFailed{false};
+    QVector<ulong> m_rayPartitions;
 };

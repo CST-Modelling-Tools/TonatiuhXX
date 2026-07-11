@@ -8,7 +8,7 @@
 
 #include "benchmark/BenchmarkRunner.h"
 #include "core/CorePluginRegistry.h"
-#include "core/ParallelRayTraceExecutor.h"
+#include "core/RayTraceExecutor.h"
 #include "core/SceneLoader.h"
 #include "core/TonatiuhCore.h"
 #include "headless/HeadlessScriptHost.h"
@@ -122,13 +122,13 @@ int HeadlessCommandRunner::traceScene(const QStringList& args) const
     out << "photon_export: false" << Qt::endl;
     out << "export_path: none" << Qt::endl;
 
-    ParallelRayTraceOptions options;
+    RayTraceExecutorOptions options;
     options.rays = parsed.rays;
     options.seed = parsed.seed;
     options.recordPhotons = false;
 
-    ParallelRayTraceResult result;
-    ParallelRayTraceExecutor executor;
+    RayTraceExecutorResult result;
+    RayTraceExecutor executor;
     if (!executor.trace(scene.get(), options, &result, &errorMessage, TextProgressReporter(&out))) {
         err << "Trace failed: " << errorMessage << Qt::endl;
         return 1;
