@@ -8,7 +8,12 @@ add_executable(tonatiuhpp_standard_random_tests
 )
 
 target_include_directories(tonatiuhpp_standard_random_tests PRIVATE "${CMAKE_SOURCE_DIR}")
-target_link_libraries(tonatiuhpp_standard_random_tests PRIVATE GTest::gtest_main TonatiuhKernel)
+target_link_libraries(tonatiuhpp_standard_random_tests
+  PRIVATE
+    GTest::gtest_main
+    Qt6::Core
+    TonatiuhKernel
+)
 
 if(MSVC)
   target_compile_options(tonatiuhpp_standard_random_tests PRIVATE /permissive- /Zc:__cplusplus)
