@@ -13,6 +13,7 @@ class TONATIUH_KERNEL RandomParallel: public Random
 
 public:
     RandomParallel(Random* rand, QMutex* mutex, ulong size = 100'000);
+    RandomParallel(Random* rand, QMutex* mutex, ulong size, bool diagnosticsEnabled);
 
     void FillArray(std::vector<double>& array);
 

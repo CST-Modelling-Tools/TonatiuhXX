@@ -27,6 +27,7 @@ struct RayTraceWorkerState
 {
     std::shared_ptr<QPromise<void>> promise;
     std::atomic_bool* exportFailed = nullptr;
+    RayTraceDiagnostics* diagnostics = nullptr;
     std::function<void(ulong)> traceChunk;
     qulonglong chunkCount = 0;
     ulong chunkSize = 0;
@@ -49,6 +50,21 @@ struct RayTraceWorkerState
 
     void runWorker() noexcept
     {
+        struct WorkerDiagnostic
+        {
+            RayTraceDiagnostics* diagnostics;
+            explicit WorkerDiagnostic(RayTraceDiagnostics* value): diagnostics(value)
+            {
+                if (diagnostics)
+                    diagnostics->workerStarted();
+            }
+            ~WorkerDiagnostic()
+            {
+                if (diagnostics)
+                    diagnostics->workerFinished();
+            }
+        } workerDiagnostic(diagnostics);
+
         try {
             while (!failed.load() && !exportFailed->load() && !promise->isCanceled()) {
                 const qulonglong chunkIndex = nextChunk.fetch_add(1);
@@ -164,6 +180,7 @@ RayTraceExecution RayTraceExecutor::start(PreparedTraceContext&& context)
         m_workerState = std::make_shared<RayTraceWorkerState>();
         m_workerState->promise = std::move(promise);
         m_workerState->exportFailed = &m_exportFailed;
+        m_workerState->diagnostics = m_diagnostics.get();
         m_workerState->chunkCount = chunkCount;
         m_workerState->chunkSize = kRayChunkSize;
         m_workerState->totalRays = prepared.m_rays;
@@ -251,12 +268,12 @@ bool RayTraceExecutor::waitForFinished(RayTraceExecution* execution, QString* er
             qInfo().nospace()
                 << "RayTraceExecutor aggregate diagnostics: total_rng_refills=" << m_diagnostics->totalRefillCount.load()
                 << ", summed_rng_mutex_wait_ms=" << m_diagnostics->summedMutexWaitNanoseconds.load() / 1.e6
-                << ", maximum_partition_rng_mutex_wait_ms=" << m_diagnostics->maximumPartitionMutexWaitNanoseconds.load() / 1.e6
+                << ", maximum_chunk_rng_mutex_wait_ms=" << m_diagnostics->maximumChunkMutexWaitNanoseconds.load() / 1.e6
                 << ", summed_rng_refill_generation_ms=" << m_diagnostics->summedRefillNanoseconds.load() / 1.e6
-                << ", maximum_partition_rng_refill_generation_ms=" << m_diagnostics->maximumPartitionRefillNanoseconds.load() / 1.e6
+                << ", maximum_chunk_rng_refill_generation_ms=" << m_diagnostics->maximumChunkRefillNanoseconds.load() / 1.e6
                 << ", tracing_wall_ms=" << m_diagnostics->wallNanoseconds() / 1.e6
                 << ", distinct_worker_threads=" << m_diagnostics->distinctWorkerThreadCount()
-                << ", maximum_active_partitions=" << m_diagnostics->maximumActivePartitions.load();
+                << ", maximum_active_workers=" << m_diagnostics->maximumActiveWorkers.load();
             m_diagnostics.reset();
         }
         execution->started = false;

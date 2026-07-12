@@ -1,5 +1,4 @@
 #include <QPoint>
-#include <QDebug>
 #include <QElapsedTimer>
 #include <QThread>
 
@@ -34,17 +33,17 @@ void RayTraceDiagnostics::start()
     m_wallTimer.start();
 }
 
-void RayTraceDiagnostics::partitionStarted()
+void RayTraceDiagnostics::workerStarted()
 {
-    const int active = activePartitions.fetch_add(1) + 1;
-    updateMaximum(maximumActivePartitions, active);
+    const int active = activeWorkers.fetch_add(1) + 1;
+    updateMaximum(maximumActiveWorkers, active);
     QMutexLocker locker(&m_workerThreadsMutex);
     m_workerThreads.insert(reinterpret_cast<quintptr>(QThread::currentThreadId()));
 }
 
-void RayTraceDiagnostics::partitionFinished()
+void RayTraceDiagnostics::workerFinished()
 {
-    activePartitions.fetch_sub(1);
+    activeWorkers.fetch_sub(1);
 }
 
 void RayTraceDiagnostics::recordRandomStats(quint64 refillCount, qint64 mutexWaitNanoseconds, qint64 refillNanoseconds)
@@ -52,8 +51,8 @@ void RayTraceDiagnostics::recordRandomStats(quint64 refillCount, qint64 mutexWai
     totalRefillCount.fetch_add(refillCount);
     summedMutexWaitNanoseconds.fetch_add(mutexWaitNanoseconds);
     summedRefillNanoseconds.fetch_add(refillNanoseconds);
-    updateMaximum(maximumPartitionMutexWaitNanoseconds, mutexWaitNanoseconds);
-    updateMaximum(maximumPartitionRefillNanoseconds, refillNanoseconds);
+    updateMaximum(maximumChunkMutexWaitNanoseconds, mutexWaitNanoseconds);
+    updateMaximum(maximumChunkRefillNanoseconds, refillNanoseconds);
 }
 
 int RayTraceDiagnostics::distinctWorkerThreadCount() const
@@ -102,38 +101,11 @@ RayTracer::RayTracer(InstanceNode* instanceRoot,
 
 void RayTracer::operator()(ulong nRays)
 {
-    struct PartitionDiagnostic
-    {
-        bool enabled;
-        ulong rays;
-
-        RayTraceDiagnostics* aggregate = nullptr;
-
-        PartitionDiagnostic(bool enabled, ulong rays, RayTraceDiagnostics* aggregate):
-            enabled(enabled),
-            rays(rays),
-            aggregate(aggregate)
-        {
-            if (aggregate)
-                aggregate->partitionStarted();
-            if (enabled)
-                qInfo() << "RayTraceExecutor partition start: thread=" << QThread::currentThreadId() << "rays=" << rays;
-        }
-
-        ~PartitionDiagnostic()
-        {
-            if (aggregate)
-                aggregate->partitionFinished();
-            if (enabled)
-                qInfo() << "RayTraceExecutor partition finish: thread=" << QThread::currentThreadId() << "rays=" << rays;
-        }
-    } diagnostic(m_diagnostics != nullptr, nRays, m_diagnostics);
-
     if (m_sunCells.empty()) return;
     if (m_exportFailed && m_exportFailed->load())
         return;
 
-    RandomParallel rand(m_rand, m_mutexRand);
+    RandomParallel rand(m_rand, m_mutexRand, 100'000, m_diagnostics != nullptr);
     struct RandomDiagnostic
     {
         RandomParallel* random;

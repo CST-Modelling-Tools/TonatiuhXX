@@ -3,10 +3,15 @@
 #include <QElapsedTimer>
 
 RandomParallel::RandomParallel(Random* rand, QMutex* mutex, ulong size):
+    RandomParallel(rand, mutex, size, false)
+{
+}
+
+RandomParallel::RandomParallel(Random* rand, QMutex* mutex, ulong size, bool diagnosticsEnabled):
     Random(size),
     m_rand(rand),
     m_mutex(mutex),
-    m_diagnosticsEnabled(qEnvironmentVariableIntValue("TONATIUHPP_TRACE_THREAD_DIAGNOSTICS") > 0)
+    m_diagnosticsEnabled(diagnosticsEnabled)
 {
 
 }

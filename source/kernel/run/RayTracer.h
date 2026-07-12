@@ -38,19 +38,19 @@ struct TONATIUH_KERNEL RayTracerHit
 struct TONATIUH_KERNEL RayTraceDiagnostics
 {
     void start();
-    void partitionStarted();
-    void partitionFinished();
+    void workerStarted();
+    void workerFinished();
     void recordRandomStats(quint64 refillCount, qint64 mutexWaitNanoseconds, qint64 refillNanoseconds);
     int distinctWorkerThreadCount() const;
     qint64 wallNanoseconds() const;
 
     std::atomic<quint64> totalRefillCount{0};
     std::atomic<qint64> summedMutexWaitNanoseconds{0};
-    std::atomic<qint64> maximumPartitionMutexWaitNanoseconds{0};
+    std::atomic<qint64> maximumChunkMutexWaitNanoseconds{0};
     std::atomic<qint64> summedRefillNanoseconds{0};
-    std::atomic<qint64> maximumPartitionRefillNanoseconds{0};
-    std::atomic<int> activePartitions{0};
-    std::atomic<int> maximumActivePartitions{0};
+    std::atomic<qint64> maximumChunkRefillNanoseconds{0};
+    std::atomic<int> activeWorkers{0};
+    std::atomic<int> maximumActiveWorkers{0};
 
 private:
     mutable QMutex m_workerThreadsMutex;
