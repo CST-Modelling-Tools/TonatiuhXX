@@ -49,6 +49,28 @@ struct RayTraceWorkerState
 
     void runWorker() noexcept
     {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+        class WorkerServiceLevel
+        {
+        public:
+            WorkerServiceLevel():
+                m_thread(QThread::currentThread()),
+                m_previous(m_thread->serviceLevel())
+            {
+                m_thread->setServiceLevel(QThread::QualityOfService::High);
+            }
+
+            ~WorkerServiceLevel()
+            {
+                m_thread->setServiceLevel(m_previous);
+            }
+
+        private:
+            QThread* m_thread;
+            QThread::QualityOfService m_previous;
+        } workerServiceLevel;
+#endif
+
         try {
             while (!failed.load() && !exportFailed->load() && !promise->isCanceled()) {
                 const qulonglong chunkIndex = nextChunk.fetch_add(1);
