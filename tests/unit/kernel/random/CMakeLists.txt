@@ -5,14 +5,15 @@ endif()
 
 add_executable(tonatiuhpp_standard_random_tests
   StandardRandomTests.cpp
+  "${CMAKE_SOURCE_DIR}/kernel/random/StandardRandom.cpp"
 )
 
+target_compile_definitions(tonatiuhpp_standard_random_tests PRIVATE TONATIUH_KERNEL_EXPORT)
 target_include_directories(tonatiuhpp_standard_random_tests PRIVATE "${CMAKE_SOURCE_DIR}")
 target_link_libraries(tonatiuhpp_standard_random_tests
   PRIVATE
     GTest::gtest_main
     Qt6::Core
-    TonatiuhKernel
 )
 
 if(MSVC)
