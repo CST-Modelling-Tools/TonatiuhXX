@@ -21,6 +21,7 @@ class RayTraceExecutor;
 class PreparedTraceContext;
 struct RayTracerHit;
 struct RayTraceDiagnostics;
+struct RayTraceWorkerState;
 
 struct RayTraceExecutorResult
 {
@@ -75,8 +76,8 @@ public:
     using ProgressCallback = std::function<void(const QString&)>;
     using HitCallback = std::function<void(const RayTracerHit&)>;
 
-    // Retained for source compatibility; returns the adaptive ray work items
-    // consumed dynamically by the global Qt thread pool.
+    // Retained for source compatibility; returns the fixed-size chunks
+    // acquired dynamically by long-lived global-pool workers.
     static QVector<ulong> guiRaysPerThread(ulong rays);
     static qulonglong taskCountForRays(ulong rays);
 
@@ -94,7 +95,7 @@ private:
     QMutex m_photonBufferMutex;
     std::atomic_bool m_active{false};
     std::atomic_bool m_exportFailed{false};
-    QVector<ulong> m_rayPartitions;
     std::shared_ptr<RayTraceDiagnostics> m_diagnostics;
+    std::shared_ptr<RayTraceWorkerState> m_workerState;
     std::shared_ptr<PreparedTraceContext> m_activeContext;
 };

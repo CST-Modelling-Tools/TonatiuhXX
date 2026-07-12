@@ -1,13 +1,18 @@
 #include "RayTraceExecutor.h"
 
 #include <exception>
+#include <limits>
+#include <memory>
+#include <vector>
 
 #include <QDebug>
 #include <QFuture>
 #include <QMutex>
+#include <QMutexLocker>
+#include <QPromise>
+#include <QRunnable>
 #include <QThread>
 #include <QThreadPool>
-#include <QtConcurrentMap>
 
 #include "core/TracePreparation.h"
 #include "kernel/run/InstanceNode.h"
@@ -15,43 +20,91 @@
 
 namespace
 {
-constexpr ulong kMaximumRayWorkItemSize = 100'000;
-constexpr int kTargetWorkItemsPerThread = 8;
-
+constexpr ulong kRayChunkSize = 10'000;
 }
+
+struct RayTraceWorkerState
+{
+    std::shared_ptr<QPromise<void>> promise;
+    std::atomic_bool* exportFailed = nullptr;
+    std::function<void(ulong)> traceChunk;
+    qulonglong chunkCount = 0;
+    ulong chunkSize = 0;
+    ulong totalRays = 0;
+    std::atomic<qulonglong> nextChunk{0};
+    std::atomic<qulonglong> completedChunks{0};
+    std::atomic<int> remainingWorkers{0};
+    std::atomic_bool failed{false};
+    QMutex errorMutex;
+    QMutex progressMutex;
+    QString errorMessage;
+
+    void recordFailure(const QString& message)
+    {
+        QMutexLocker lock(&errorMutex);
+        if (errorMessage.isEmpty())
+            errorMessage = message;
+        failed.store(true);
+    }
+
+    void runWorker() noexcept
+    {
+        try {
+            while (!failed.load() && !exportFailed->load() && !promise->isCanceled()) {
+                const qulonglong chunkIndex = nextChunk.fetch_add(1);
+                if (chunkIndex >= chunkCount)
+                    break;
+
+                const qulonglong chunkStart = chunkIndex * static_cast<qulonglong>(chunkSize);
+                const ulong raysThisChunk = static_cast<ulong>(qMin<qulonglong>(
+                    chunkSize,
+                    static_cast<qulonglong>(totalRays) - chunkStart
+                ));
+                traceChunk(raysThisChunk);
+
+                const qulonglong completed = completedChunks.fetch_add(1) + 1;
+                QMutexLocker progressLock(&progressMutex);
+                promise->setProgressValue(static_cast<int>(qMin<qulonglong>(
+                    completed,
+                    static_cast<qulonglong>(std::numeric_limits<int>::max())
+                )));
+            }
+        } catch (const std::exception& error) {
+            recordFailure(QString("Ray tracing worker failed: %1").arg(error.what()));
+        } catch (...) {
+            recordFailure("Ray tracing worker failed with an unknown exception.");
+        }
+
+        if (remainingWorkers.fetch_sub(1) == 1)
+            promise->finish();
+    }
+};
 
 QVector<ulong> RayTraceExecutor::guiRaysPerThread(ulong rays)
 {
-    QVector<ulong> workItems;
+    QVector<ulong> chunks;
     if (rays == 0)
-        return workItems;
+        return chunks;
 
-    const qulonglong threadCount = static_cast<qulonglong>(qMax(1, QThreadPool::globalInstance()->maxThreadCount()));
-    const qulonglong targetWorkItemCount = threadCount * static_cast<qulonglong>(kTargetWorkItemsPerThread);
     const qulonglong rayCount = static_cast<qulonglong>(rays);
-    const qulonglong balancedWorkItemSize =
-        rayCount / targetWorkItemCount + (rayCount % targetWorkItemCount != 0 ? 1 : 0);
-    const ulong workItemSize = static_cast<ulong>(qMax<qulonglong>(
-        1,
-        qMin<qulonglong>(kMaximumRayWorkItemSize, balancedWorkItemSize)
-    ));
-    const qulonglong workItemCount =
-        rayCount / workItemSize + (rayCount % workItemSize != 0 ? 1 : 0);
-    workItems.reserve(static_cast<qsizetype>(workItemCount));
+    const qulonglong chunkCount = rayCount / kRayChunkSize + (rayCount % kRayChunkSize != 0 ? 1 : 0);
+    chunks.reserve(static_cast<qsizetype>(chunkCount));
 
     ulong remaining = rays;
     while (remaining > 0) {
-        const ulong currentWorkItemSize = qMin(workItemSize, remaining);
-        workItems << currentWorkItemSize;
-        remaining -= currentWorkItemSize;
+        const ulong raysThisChunk = qMin(kRayChunkSize, remaining);
+        chunks << raysThisChunk;
+        remaining -= raysThisChunk;
     }
-
-    return workItems;
+    return chunks;
 }
 
 qulonglong RayTraceExecutor::taskCountForRays(ulong rays)
 {
-    return static_cast<qulonglong>(guiRaysPerThread(rays).size());
+    if (rays == 0)
+        return 0;
+    const qulonglong rayCount = static_cast<qulonglong>(rays);
+    return rayCount / kRayChunkSize + (rayCount % kRayChunkSize != 0 ? 1 : 0);
 }
 
 RayTraceExecution RayTraceExecutor::start(PreparedTraceContext&& context)
@@ -71,55 +124,94 @@ RayTraceExecution RayTraceExecutor::start(PreparedTraceContext&& context)
 
     m_exportFailed.store(false);
     m_diagnostics.reset();
+    m_workerState.reset();
     try {
         m_activeContext = std::make_shared<PreparedTraceContext>(std::move(context));
         execution.preparedContext = m_activeContext;
         PreparedTraceContext& prepared = *m_activeContext;
-        m_rayPartitions = guiRaysPerThread(prepared.m_rays);
+        const qulonglong chunkCount = taskCountForRays(prepared.m_rays);
+        const int workerCount = qMax(1, qMin<int>(
+            QThreadPool::globalInstance()->maxThreadCount(),
+            static_cast<int>(qMin<qulonglong>(chunkCount, static_cast<qulonglong>(std::numeric_limits<int>::max())))
+        ));
+
         if (qEnvironmentVariableIntValue("TONATIUHPP_TRACE_THREAD_DIAGNOSTICS") > 0) {
             m_diagnostics = std::make_shared<RayTraceDiagnostics>();
             m_diagnostics->start();
-            int nonzeroPartitions = 0;
-            for (ulong partitionRays : std::as_const(m_rayPartitions)) {
-                if (partitionRays > 0)
-                    ++nonzeroPartitions;
-            }
             qInfo().nospace()
-                << "RayTraceExecutor diagnostics: partitions=" << m_rayPartitions.size()
-                << ", nonzero_partitions=" << nonzeroPartitions
+                << "RayTraceExecutor diagnostics: chunks=" << chunkCount
+                << ", chunk_size=" << kRayChunkSize
+                << ", workers=" << workerCount
                 << ", global_pool_max_threads=" << QThreadPool::globalInstance()->maxThreadCount()
                 << ", ideal_threads=" << QThread::idealThreadCount();
         }
-        execution.future = QtConcurrent::map(
-            m_rayPartitions,
-            RayTracer(prepared.m_layoutRoot,
-                      prepared.m_sunInstance,
-                      prepared.m_sunAperture,
-                      prepared.m_sunShape,
-                      prepared.m_tracingAir,
-                      prepared.m_random,
-                      &m_randomMutex,
-                      prepared.m_photonBuffer,
-                      prepared.m_photonBuffer ? &m_photonBufferMutex : nullptr,
-                      prepared.m_exportSurfaceList,
-                      &m_exportFailed,
-                      prepared.m_hitCallback,
-                      m_diagnostics.get())
-        );
+
+        auto promise = std::make_shared<QPromise<void>>();
+        promise->start();
+        promise->setProgressRange(0, static_cast<int>(qMin<qulonglong>(
+            chunkCount,
+            static_cast<qulonglong>(std::numeric_limits<int>::max())
+        )));
+        execution.future = promise->future();
         if (!execution.future.isValid()) {
-            execution.errorMessage = "Could not start ray tracing because QtConcurrent returned an invalid future.";
+            promise->finish();
+            execution.errorMessage = "Could not start ray tracing because the worker-loop future is invalid.";
             m_activeContext.reset();
             m_active.store(false);
             return execution;
         }
+
+        m_workerState = std::make_shared<RayTraceWorkerState>();
+        m_workerState->promise = std::move(promise);
+        m_workerState->exportFailed = &m_exportFailed;
+        m_workerState->chunkCount = chunkCount;
+        m_workerState->chunkSize = kRayChunkSize;
+        m_workerState->totalRays = prepared.m_rays;
+        m_workerState->remainingWorkers.store(workerCount);
+        const std::shared_ptr<PreparedTraceContext> workerContext = m_activeContext;
+        const std::shared_ptr<RayTraceDiagnostics> workerDiagnostics = m_diagnostics;
+        m_workerState->traceChunk = [this, workerContext, workerDiagnostics](ulong raysThisChunk) {
+            RayTracer tracer(workerContext->m_layoutRoot,
+                             workerContext->m_sunInstance,
+                             workerContext->m_sunAperture,
+                             workerContext->m_sunShape,
+                             workerContext->m_tracingAir,
+                             workerContext->m_random,
+                             &m_randomMutex,
+                             workerContext->m_photonBuffer,
+                             workerContext->m_photonBuffer ? &m_photonBufferMutex : nullptr,
+                             workerContext->m_exportSurfaceList,
+                             &m_exportFailed,
+                             workerContext->m_hitCallback,
+                             workerDiagnostics.get());
+            tracer(raysThisChunk);
+        };
+
+        std::vector<std::unique_ptr<QRunnable>> workerTasks;
+        workerTasks.reserve(static_cast<size_t>(workerCount));
+        for (int worker = 0; worker < workerCount; ++worker) {
+            const std::shared_ptr<RayTraceWorkerState> workerState = m_workerState;
+            workerTasks.emplace_back(QRunnable::create([workerState]() {
+                workerState->runWorker();
+            }));
+        }
+        for (std::unique_ptr<QRunnable>& workerTask : workerTasks)
+            QThreadPool::globalInstance()->start(workerTask.release());
+
         execution.started = true;
         execution.owner = this;
     } catch (const std::exception& error) {
+        if (m_workerState && m_workerState->promise)
+            m_workerState->promise->finish();
         execution.errorMessage = QString("Could not start ray tracing: %1").arg(error.what());
+        m_workerState.reset();
         m_activeContext.reset();
         m_active.store(false);
     } catch (...) {
+        if (m_workerState && m_workerState->promise)
+            m_workerState->promise->finish();
         execution.errorMessage = "Could not start ray tracing because an unknown exception was raised.";
+        m_workerState.reset();
         m_activeContext.reset();
         m_active.store(false);
     }
@@ -137,16 +229,24 @@ bool RayTraceExecutor::waitForFinished(RayTraceExecution* execution, QString* er
     struct ActiveRunReset
     {
         std::atomic_bool* active;
+        std::shared_ptr<RayTraceWorkerState>* workerState;
         std::shared_ptr<PreparedTraceContext>* context;
         ~ActiveRunReset()
         {
+            workerState->reset();
             context->reset();
             active->store(false);
         }
-    } reset{&m_active, &m_activeContext};
+    } reset{&m_active, &m_workerState, &m_activeContext};
 
     try {
         execution->future.waitForFinished();
+        const bool workerFailed = m_workerState && m_workerState->failed.load();
+        QString workerError;
+        if (m_workerState) {
+            QMutexLocker errorLock(&m_workerState->errorMutex);
+            workerError = m_workerState->errorMessage;
+        }
         if (m_diagnostics) {
             qInfo().nospace()
                 << "RayTraceExecutor aggregate diagnostics: total_rng_refills=" << m_diagnostics->totalRefillCount.load()
@@ -161,6 +261,11 @@ bool RayTraceExecutor::waitForFinished(RayTraceExecution* execution, QString* er
         }
         execution->started = false;
         execution->owner = nullptr;
+        if (workerFailed) {
+            if (errorMessage)
+                *errorMessage = workerError.isEmpty() ? "Ray tracing worker failed." : workerError;
+            return false;
+        }
         return true;
     } catch (const std::exception& error) {
         if (errorMessage)
