@@ -9,8 +9,8 @@ Use this checklist when preparing a Tonatiuh++ release that must be visible to t
 - Ensure the version matches the intended release exactly.
 
 Example:
-- App version: `0.1.8.18`
-- Tag: `v0.1.8.18`
+- App version: `0.1.8.26`
+- Tag: `v0.1.8.26`
 
 ## 2. Create the release tag
 
@@ -104,7 +104,7 @@ Before declaring the release complete, verify:
 - Windows executable and associated file types show the expected Tonatiuh++ icon
 - `Help > Documentation` opens the packaged runtime help on each platform
 - Linux and macOS artifacts launch on clean machines without developer environment variables
-- The v0.1.8.25 installed-runtime headless automation checklist below passes on Windows, Ubuntu, and macOS after an IFW updater install
+- The release-specific `docs/release-checklist-v0.1.8.26.md` passes; the v0.1.8.25 installed-runtime checklist below remains as the historical published-release procedure
 
 ## 8. v0.1.8.25 installed-runtime headless automation validation
 

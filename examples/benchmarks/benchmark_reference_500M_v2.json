@@ -1,0 +1,27 @@
+{
+  "benchmark": "benchmark_v2",
+  "schema_version": 1,
+  "rays": 500000000,
+  "seed": 123456789,
+  "chunk_count": 50000,
+  "chunk_size": 10000,
+  "scene_file": "benchmark_heliostat_field_v1.tnhpp",
+  "target_side_id": 1,
+  "target_bounds": {
+    "x_min": -2,
+    "x_max": 2,
+    "y_min": -2,
+    "y_max": 2
+  },
+  "target_grid": {
+    "width": 100,
+    "height": 100
+  },
+  "total_power_mw": 42.217052166502086,
+  "minimum_flux_mw_m2": 0.0807424687410667,
+  "average_flux_mw_m2": 2.638565760406375,
+  "maximum_flux_mw_m2": 19.52519778288914,
+  "flux_grid_sha256": "36c7dc17cee8e7fdef820f08d4482e7c3dcdee3b5eed4748ea3949a6cf4af472",
+  "flux_grid_binary_file": "benchmark_reference_flux_grid_500M_v2.bin",
+  "flux_grid_file": "benchmark_reference_flux_grid_500M_v2.csv"
+}

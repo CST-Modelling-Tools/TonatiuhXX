@@ -130,21 +130,31 @@ Tonatiuh++ runs benchmark v1 through the existing executable:
 tonatiuhpp --headless benchmark benchmark_config.json
 ```
 
-The benchmark config is a JSON object. The formal schema is `docs/benchmark_config_schema_v1.json`, and an example template is available at `examples/benchmarks/benchmark_config_v1.example.json`.
+The benchmark config is a JSON object. The formal execution schema remains `docs/benchmark_config_schema_v1.json`. The current reference example is `examples/benchmarks/benchmark_config_v2.example.json`; `benchmark_config_v1.example.json` remains available for historical workflows.
 
 ## Benchmark Dataset
 
-The Tonatiuh++ benchmark v1 reference dataset is archived on Zenodo:
+The historical Tonatiuh++ benchmark v1 reference dataset is archived on Zenodo:
 
 ```text
 https://doi.org/10.5281/zenodo.20395328
 ```
 
-Use the dataset scene, config, reference JSON, and flux-grid reference files when reproducing the published benchmark baseline.
+Reference v1 corresponds to the previous random-stream architecture. Reference v2 uses the same benchmark-v1 scene, receiver mapping, grid, formulas, and tolerances with deterministic private `std::mt19937_64` streams derived per stable ray chunk. The v2 reference files are installed with the benchmark examples:
+
+- `benchmark_reference_500M_v2.json`
+- `benchmark_reference_flux_grid_500M_v2.bin`
+- `benchmark_reference_flux_grid_500M_v2.csv`
+
+The validated v2 binary SHA-256 is `36c7dc17cee8e7fdef820f08d4482e7c3dcdee3b5eed4748ea3949a6cf4af472`. The reference change is caused by stream decomposition, not a change to ray physics. Historical v1 photon sequences and grid hashes are therefore not expected to match v2.
+
+The configuration value remains `"benchmark": "benchmark_v1"` because it identifies the implemented benchmark definition. The v2 label identifies the scientific reference set, not a second benchmark formula or schema.
 
 ## Scheduling
 
-GUI and headless tracing use the same `RayTraceExecutor`: stable 10,000-ray chunks, one deterministic `std::mt19937_64` stream derived from the master seed and chunk index for each chunk, and the QtConcurrent global thread pool. Benchmark configuration fields `worker_count` and `chunk_size` are not supported; the fixed chunk size is part of the deterministic tracing contract.
+GUI and headless tracing use the same `RayTraceExecutor`: long-lived workers on the global `QThreadPool`, stable 10,000-ray chunks acquired through one atomic counter, and one deterministic `std::mt19937_64` stream derived from the master seed and chunk index for each chunk. Benchmark configuration fields `worker_count` and `chunk_size` are not supported; the fixed chunk size is part of the deterministic tracing contract.
+
+`worker_count` remains runtime metadata and is not part of the scientific reference identity. Chunk size is part of that identity because changing it changes stream decomposition.
 
 Random streams are reproducible across conforming standard libraries because seed derivation uses fixed-width unsigned arithmetic and uniform doubles use an explicit high-53-bit mapping rather than `std::uniform_real_distribution`. Final scientific outputs can still differ across platforms because the surrounding floating-point physics is not guaranteed to be bit-identical. Changing the fixed chunk size changes stream decomposition and therefore exact ray histories and hashes.
 
@@ -155,8 +165,8 @@ Benchmark result JSON always includes the effective scheduling fields:
 ```json
 {
   "worker_count": 20,
-  "chunk_count": 100,
-  "chunk_size": 5000000
+  "chunk_count": 50000,
+  "chunk_size": 10000
 }
 ```
 

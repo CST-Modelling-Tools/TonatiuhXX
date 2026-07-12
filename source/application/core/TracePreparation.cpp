@@ -2,8 +2,6 @@
 
 #include <type_traits>
 
-#include <QThread>
-
 #include "core/RayTraceExecutor.h"
 #include "kernel/air/AirTransmission.h"
 #include "kernel/air/AirVacuum.h"
@@ -209,7 +207,7 @@ void TracePreparation::initializeResult(const PreparedTraceContext& context, Ray
     result->sunApertureArea = context.sunApertureArea();
     result->irradiance = context.irradiance();
     result->powerPerRay = context.powerPerRay();
-    result->workerCount = qMax(1, QThread::idealThreadCount());
+    result->workerCount = RayTraceExecutor::workerCountForRays(context.m_rays);
     result->chunkSize = workItems.isEmpty() ? 0 : workItems.first();
     result->chunkCount = static_cast<qulonglong>(workItems.size());
 }

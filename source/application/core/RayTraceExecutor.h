@@ -79,6 +79,7 @@ public:
     // acquired dynamically by long-lived global-pool workers.
     static QVector<ulong> guiRaysPerThread(ulong rays);
     static qulonglong taskCountForRays(ulong rays);
+    static int workerCountForRays(ulong rays);
 
     // One executor instance supports one active execution at a time. Every
     // successful launch must be completed through waitForFinished().

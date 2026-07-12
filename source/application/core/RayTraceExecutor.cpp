@@ -129,6 +129,15 @@ qulonglong RayTraceExecutor::taskCountForRays(ulong rays)
     return rayCount / kRayChunkSize + (rayCount % kRayChunkSize != 0 ? 1 : 0);
 }
 
+int RayTraceExecutor::workerCountForRays(ulong rays)
+{
+    const qulonglong chunkCount = taskCountForRays(rays);
+    return qMax(1, qMin<int>(
+        QThreadPool::globalInstance()->maxThreadCount(),
+        static_cast<int>(qMin<qulonglong>(chunkCount, static_cast<qulonglong>(std::numeric_limits<int>::max())))
+    ));
+}
+
 RayTraceExecution RayTraceExecutor::start(PreparedTraceContext&& context)
 {
     RayTraceExecution execution;
@@ -151,10 +160,7 @@ RayTraceExecution RayTraceExecutor::start(PreparedTraceContext&& context)
         execution.preparedContext = m_activeContext;
         PreparedTraceContext& prepared = *m_activeContext;
         const qulonglong chunkCount = taskCountForRays(prepared.m_rays);
-        const int workerCount = qMax(1, qMin<int>(
-            QThreadPool::globalInstance()->maxThreadCount(),
-            static_cast<int>(qMin<qulonglong>(chunkCount, static_cast<qulonglong>(std::numeric_limits<int>::max())))
-        ));
+        const int workerCount = workerCountForRays(prepared.m_rays);
 
         auto promise = std::make_shared<QPromise<void>>();
         promise->start();

@@ -6,24 +6,25 @@ Purpose: lightweight handoff for current Tonatiuh++ project and release context.
 
 ## Current Priorities
 
-- Prepare the Tonatiuh++ `v0.1.8.25` release; source metadata is now bumped, but do not tag until release notes, release workflow validation, and platform validation are complete.
-- Validate the `v0.1.8.25` release notes, release checklist, runtime help packaging, file-association hardening, headless command output, CTest coverage, and platform packaging.
+- Prepare the Tonatiuh++ `v0.1.8.26` release from the published `v0.1.8.25` baseline; source metadata, release notes, benchmark v2 assets, citation metadata, and the release checklist are prepared, but do not tag until build, test, packaging, and platform validation are complete.
+- Validate the `v0.1.8.26` canonical tracing/RNG changes, Qt worker QoS behavior, benchmark reference v2, release notes, runtime help, headless commands, CTest coverage, updater path, and platform packages.
 - Remove or reduce remaining runtime warnings visible from command-prompt launches.
 - Validate the IFW updater path from the latest published IFW baseline to the next tagged release on Windows, Linux, and macOS.
 
 ## Current Baseline
 
 - Branch: `master`.
-- Current application version in `source/CMakeLists.txt`: `0.1.8.25`.
-- Latest existing Git tag: `v0.1.8.24`.
-- Next intended release target: `v0.1.8.25`.
-- Release readiness: source version metadata is bumped to `0.1.8.25`; the release is not ready to tag until release notes, release workflow validation, and Windows/Linux/macOS platform validation are complete.
-- Previous release baseline for updater validation: latest published IFW build with updater support, expected to be `v0.1.8.24`.
-- Intended release under validation: `v0.1.8.25`, focused on the first minimal true-headless script runner plus validation of the post-v0.1.8.24 runtime packaging, help, file-association, headless-test, and unit-test hardening.
+- Current published release and latest Git tag: `v0.1.8.25`.
+- Current application version in `source/CMakeLists.txt`: `0.1.8.26`.
+- Next intended release target: `v0.1.8.26`.
+- Release readiness: source and documentation preparation is complete; clean builds, full tests, GUI/headless validation, Linux/macOS scientific comparison, packaging, updater checks, signing, tagging, GitHub publication, and Zenodo publication remain external steps.
+- Previous release baseline for updater validation: published `v0.1.8.25` IFW installations.
+- Intended release under validation: `v0.1.8.26`, focused on the canonical tracing architecture, deterministic per-chunk RNG streams, removal of legacy RNG/profiling infrastructure, hybrid-CPU QoS correction, and benchmark reference v2.
 - Release packaging source of truth: `.github/workflows/release.yml` and `installer/`.
 - Headless execution foundation is now implemented in the existing `tonatiuhpp` executable; there is no separate console executable or installer target.
 - Current headless commands: `tonatiuhpp --headless --help`, `tonatiuhpp --headless validate-scene <scene.tnhpp>`, `tonatiuhpp --headless trace-scene <scene.tnhpp> --rays N --seed S --no-export`, `tonatiuhpp --headless benchmark <benchmark_config.json>`, and `tonatiuhpp --headless run-script <script.tnhpps>`.
-- Release notes draft: `docs/release-notes-v0.1.8.25.md`.
+- Release notes: `docs/release-notes-v0.1.8.26.md`.
+- Release checklist: `docs/release-checklist-v0.1.8.26.md`.
 - Benchmark v1 dataset DOI documented in `docs/headless-benchmark.md`: `https://doi.org/10.5281/zenodo.20395328`.
 
 ## Recent Completed Milestones
@@ -34,7 +35,7 @@ Purpose: lightweight handoff for current Tonatiuh++ project and release context.
 - Headless trace-scene foundation: builds a non-GUI `InstanceNode` tree, sizes the sun aperture from ray-tracing bounds instead of Coin GUI bounding-box traversal, runs the kernel ray tracer with deterministic private per-chunk `std::mt19937_64` streams, disables photon export by passing no photon buffer/exporter, and reports progress, elapsed seconds, and rays/s.
 - Random-number subsystem modernization: tracing now uses one private `std::mt19937_64` stream per stable 10,000-ray chunk, seeded only from the resolved master seed and chunk index through a fixed-width SplitMix64-style derivation. The shared RNG, RNG mutex, `RandomParallel` cache, legacy custom generators, RNG plugin selection, and internal tracing/RNG profiler instrumentation were removed. Exact historical photon sequences and flux-grid hashes may change; external scientific and cross-platform validation remains required, and future performance analysis must use external profilers.
 - Hybrid-CPU scheduling fix: on Qt 6.9 and newer, each long-lived ray worker temporarily requests `QThread::QualityOfService::High` and restores its previous service level on exit. This corrected observed Windows headless runs where 20 runnable workers were time-sliced across the four i7-12700K E-cores despite unrestricted affinity. Rebuilt 10,000,000- and 500,000,000-ray benchmarks used all 20 logical CPUs. The full run completed in `867.486` seconds at `576378` rays/s with `42.217052` MW total power and `19.525198` MW/m2 maximum flux; total-power (`0.007896%`) and maximum-flux (`0.228023%`) tolerances passed. Its expected post-RNG-refactor flux-grid hash mismatch remains for external reference validation. GUI regression and Linux/macOS validation remain required.
-- Benchmark v2 reference candidate: the completed 500,000,000-ray post-RNG-refactor result is preserved externally as `benchmark_reference_500M_v2.json`, `benchmark_reference_flux_grid_500M_v2.bin`, and `benchmark_reference_flux_grid_500M_v2.csv`. The 80,000-byte binary contains the expected 100x100 little-endian float64 grid and its SHA256 matches the JSON value `36c7dc17cee8e7fdef820f08d4482e7c3dcdee3b5eed4748ea3949a6cf4af472`; the CSV also has exactly 100 rows and 100 columns. A second 500,000,000-ray run in a separate Windows process completed in `798.608` seconds at `626089` rays/s and passed total power, maximum flux, and exact flux-grid hash comparison with zero metric error. Cross-platform comparison and durable dataset archival remain required before treating v2 as authoritative.
+- Benchmark v2 reference candidate: the completed 500,000,000-ray post-RNG-refactor result is integrated under `examples/benchmarks/` as `benchmark_reference_500M_v2.json`, `benchmark_reference_flux_grid_500M_v2.bin`, and `benchmark_reference_flux_grid_500M_v2.csv`. The 80,000-byte binary contains the expected 100x100 little-endian float64 grid and its SHA256 matches the JSON value `36c7dc17cee8e7fdef820f08d4482e7c3dcdee3b5eed4748ea3949a6cf4af472`; the CSV also has exactly 100 rows and 100 columns. A second 500,000,000-ray run in a separate Windows process completed in `798.608` seconds at `626089` rays/s and passed total power, maximum flux, and exact flux-grid hash comparison with zero metric error. Cross-platform comparison and durable Zenodo archival remain required before treating v2 as authoritative.
 - Headless trace validation was tested on Windows with an installed plugin/mesh scene: `tonatiuhpp.exe --headless trace-scene ".../solatom_module.tnhpp" --rays 10000000 --seed 123456789 --no-export` completed in `13.384000` seconds at `747160.789002` rays/s.
 - Headless benchmark v1: `tonatiuhpp --headless benchmark <benchmark_config.json>` parses benchmark JSON, loads the configured scene without GUI startup, runs the existing ray tracer without photon export or photon buffering, accumulates target-side hits into the configured flux grid, computes power/flux metrics and a little-endian float64 grid SHA256, writes result JSON, and supports optional reference comparison fields.
 - Headless benchmark validation was tested on Windows with `benchmark_heliostat_field_v1.tnhpp` at 10,000 rays and seed `123456789`: elapsed time and rays/s were reported, result JSON was written, `total_power_mw` was `44.31264485072039`, `maximum_flux_mw_m2` was `61.354459529685954`, and `flux_grid_sha256` was `b90ae20902ed96237ea4e29f87064493ee6b91cc9b8ad3848f139885698f1074`.
@@ -82,7 +83,7 @@ Purpose: lightweight handoff for current Tonatiuh++ project and release context.
 
 ## Current Release Workflow
 
-- Source version metadata is set to `0.1.8.25`; tag `v0.1.8.25` only after release workflow and platform validation are complete.
+- Source version metadata is set to `0.1.8.26`; tag `v0.1.8.26` only after clean build, complete test, package, updater, and platform validation are complete.
 - Pushing a `v*` tag triggers the GitHub Actions `Release` workflow. `workflow_dispatch` accepts a `fake_tag` for simulation and skips the publish job.
 - The workflow resolves the version with `installer/sync_ifw_metadata.py --check-tag`, derives a UTC release date, builds Linux/macOS in a matrix, and builds Windows on `windows-2022`.
 - Packaging stages the release payload, generates per-platform IFW repositories with `repogen`, generates IFW installers with `binarycreator`, uploads assets and checksums, and deploys the IFW repositories to GitHub Pages.
@@ -127,21 +128,21 @@ Purpose: lightweight handoff for current Tonatiuh++ project and release context.
 - Confirm `tonatiuhpp --headless run-script` smoke coverage passes on Linux/macOS build-tree runners and on Windows installed-runtime CTest, including `print`, `tn.writeJson`, `tn.validateScene`, `tn.runBenchmark`, and no-export `tn.traceScene`.
 - Expand GoogleTest beyond the current math `Interval` and `Box2D` coverage, then add regression fixtures, GUI smoke tests, and benchmark/scientific validation after the smoke foundation is stable.
 - Confirm `trace-scene` and `benchmark` produce no photon files from the installed application output directory on representative runs.
-- Review and archive the completed 500,000,000-ray post-RNG-refactor Windows result, preserve its SHA256 and metric tolerances, and approve it explicitly before replacing any historical authoritative reference.
-- Confirm the `v0.1.8.25` `Release` workflow succeeds on Windows, Linux, and macOS from the matching tag.
-- Confirm GitHub Pages serves each generated `v0.1.8.25` IFW repository at the exact URL embedded in its installer.
+- Review and publish the integrated 500,000,000-ray benchmark v2 reference through the durable Zenodo dataset, preserving its SHA256 and existing metric tolerances; retain historical v1 artifacts for reproducibility.
+- Confirm the `v0.1.8.26` `Release` workflow succeeds on Windows, Linux, and macOS from the matching tag.
+- Confirm GitHub Pages serves each generated `v0.1.8.26` IFW repository at the exact URL embedded in its installer.
 - Confirm every generated repository has `Updates.xml` and package metadata for `com.tonatiuhpp.app`.
-- Test update detection from the latest published IFW baseline, expected to be `v0.1.8.24`, to `v0.1.8.25` on Windows, Linux, and macOS.
-- Test update installation from the latest published IFW baseline, expected to be `v0.1.8.24`, to `v0.1.8.25` on Windows, Linux, and macOS, including non-blocking startup check, `Help > Updates`, install prompt, MaintenanceTool launch, application shutdown, and manual restart.
+- Test update detection from published `v0.1.8.25` to `v0.1.8.26` on Windows, Linux, and macOS.
+- Test update installation from published `v0.1.8.25` to `v0.1.8.26` on Windows, Linux, and macOS, including non-blocking startup check, `Help > Updates`, install prompt, MaintenanceTool launch, application shutdown, and manual restart.
 - Reconcile or explicitly re-check release documentation if URL paths or package IDs change.
 
 ## Pre-release Checklist
 
-- Install the latest published IFW build on Windows, Linux, and macOS as the update source; use `v0.1.8.24` where those published artifacts are available.
-- Verify `source/CMakeLists.txt` has the intended `0.1.8.25` version.
+- Install published `v0.1.8.25` IFW builds on Windows, Linux, and macOS as the update source.
+- Verify `source/CMakeLists.txt` has the intended `0.1.8.26` version.
 - Create and push the matching `v<version>` tag.
 - Confirm the `Release` workflow and GitHub Pages deploy complete successfully.
 - Confirm release assets include Windows, Linux, and macOS IFW installers and checksums, plus any intended manual archives.
 - Verify each platform installer embeds the correct IFW repository URL and each URL serves `Updates.xml`.
-- After `v0.1.8.25` release repositories are published, confirm `Help > Updates` in the installed baseline app detects `v0.1.8.25`.
-- Run manual updater installation validation from the installed baseline to `v0.1.8.25` on Windows, Linux, and macOS.
+- After `v0.1.8.26` release repositories are published, confirm `Help > Updates` in the installed v0.1.8.25 app detects `v0.1.8.26`.
+- Run manual updater installation validation from installed `v0.1.8.25` to `v0.1.8.26` on Windows, Linux, and macOS.
