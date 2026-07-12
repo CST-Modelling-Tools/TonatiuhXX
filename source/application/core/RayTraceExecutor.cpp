@@ -5,7 +5,6 @@
 #include <memory>
 #include <vector>
 
-#include <QDebug>
 #include <QFuture>
 #include <QMutex>
 #include <QMutexLocker>
@@ -15,6 +14,7 @@
 #include <QThreadPool>
 
 #include "core/TracePreparation.h"
+#include "kernel/random/StandardRandom.h"
 #include "kernel/run/InstanceNode.h"
 #include "kernel/run/RayTracer.h"
 
@@ -27,8 +27,7 @@ struct RayTraceWorkerState
 {
     std::shared_ptr<QPromise<void>> promise;
     std::atomic_bool* exportFailed = nullptr;
-    RayTraceDiagnostics* diagnostics = nullptr;
-    std::function<void(ulong)> traceChunk;
+    std::function<void(qulonglong, ulong)> traceChunk;
     qulonglong chunkCount = 0;
     ulong chunkSize = 0;
     ulong totalRays = 0;
@@ -50,21 +49,6 @@ struct RayTraceWorkerState
 
     void runWorker() noexcept
     {
-        struct WorkerDiagnostic
-        {
-            RayTraceDiagnostics* diagnostics;
-            explicit WorkerDiagnostic(RayTraceDiagnostics* value): diagnostics(value)
-            {
-                if (diagnostics)
-                    diagnostics->workerStarted();
-            }
-            ~WorkerDiagnostic()
-            {
-                if (diagnostics)
-                    diagnostics->workerFinished();
-            }
-        } workerDiagnostic(diagnostics);
-
         try {
             while (!failed.load() && !exportFailed->load() && !promise->isCanceled()) {
                 const qulonglong chunkIndex = nextChunk.fetch_add(1);
@@ -76,7 +60,7 @@ struct RayTraceWorkerState
                     chunkSize,
                     static_cast<qulonglong>(totalRays) - chunkStart
                 ));
-                traceChunk(raysThisChunk);
+                traceChunk(chunkIndex, raysThisChunk);
 
                 const qulonglong completed = completedChunks.fetch_add(1) + 1;
                 QMutexLocker progressLock(&progressMutex);
@@ -127,7 +111,7 @@ RayTraceExecution RayTraceExecutor::start(PreparedTraceContext&& context)
 {
     RayTraceExecution execution;
     if (!context.m_layoutRoot || !context.m_sunInstance || !context.m_sunAperture
-        || !context.m_sunShape || !context.m_random || context.m_rays == 0) {
+        || !context.m_sunShape || context.m_rays == 0) {
         execution.errorMessage = "RayTraceExecutor requires a valid prepared trace context.";
         return execution;
     }
@@ -139,7 +123,6 @@ RayTraceExecution RayTraceExecutor::start(PreparedTraceContext&& context)
     }
 
     m_exportFailed.store(false);
-    m_diagnostics.reset();
     m_workerState.reset();
     try {
         m_activeContext = std::make_shared<PreparedTraceContext>(std::move(context));
@@ -150,17 +133,6 @@ RayTraceExecution RayTraceExecutor::start(PreparedTraceContext&& context)
             QThreadPool::globalInstance()->maxThreadCount(),
             static_cast<int>(qMin<qulonglong>(chunkCount, static_cast<qulonglong>(std::numeric_limits<int>::max())))
         ));
-
-        if (qEnvironmentVariableIntValue("TONATIUHPP_TRACE_THREAD_DIAGNOSTICS") > 0) {
-            m_diagnostics = std::make_shared<RayTraceDiagnostics>();
-            m_diagnostics->start();
-            qInfo().nospace()
-                << "RayTraceExecutor diagnostics: chunks=" << chunkCount
-                << ", chunk_size=" << kRayChunkSize
-                << ", workers=" << workerCount
-                << ", global_pool_max_threads=" << QThreadPool::globalInstance()->maxThreadCount()
-                << ", ideal_threads=" << QThread::idealThreadCount();
-        }
 
         auto promise = std::make_shared<QPromise<void>>();
         promise->start();
@@ -180,27 +152,24 @@ RayTraceExecution RayTraceExecutor::start(PreparedTraceContext&& context)
         m_workerState = std::make_shared<RayTraceWorkerState>();
         m_workerState->promise = std::move(promise);
         m_workerState->exportFailed = &m_exportFailed;
-        m_workerState->diagnostics = m_diagnostics.get();
         m_workerState->chunkCount = chunkCount;
         m_workerState->chunkSize = kRayChunkSize;
         m_workerState->totalRays = prepared.m_rays;
         m_workerState->remainingWorkers.store(workerCount);
         const std::shared_ptr<PreparedTraceContext> workerContext = m_activeContext;
-        const std::shared_ptr<RayTraceDiagnostics> workerDiagnostics = m_diagnostics;
-        m_workerState->traceChunk = [this, workerContext, workerDiagnostics](ulong raysThisChunk) {
+        m_workerState->traceChunk = [this, workerContext](qulonglong chunkIndex, ulong raysThisChunk) {
+            StandardRandom random(StandardRandom::deriveChunkSeed(workerContext->m_masterSeed, chunkIndex));
             RayTracer tracer(workerContext->m_layoutRoot,
                              workerContext->m_sunInstance,
                              workerContext->m_sunAperture,
                              workerContext->m_sunShape,
                              workerContext->m_tracingAir,
-                             workerContext->m_random,
-                             &m_randomMutex,
+                             &random,
                              workerContext->m_photonBuffer,
                              workerContext->m_photonBuffer ? &m_photonBufferMutex : nullptr,
                              workerContext->m_exportSurfaceList,
                              &m_exportFailed,
-                             workerContext->m_hitCallback,
-                             workerDiagnostics.get());
+                             workerContext->m_hitCallback);
             tracer(raysThisChunk);
         };
 
@@ -263,18 +232,6 @@ bool RayTraceExecutor::waitForFinished(RayTraceExecution* execution, QString* er
         if (m_workerState) {
             QMutexLocker errorLock(&m_workerState->errorMutex);
             workerError = m_workerState->errorMessage;
-        }
-        if (m_diagnostics) {
-            qInfo().nospace()
-                << "RayTraceExecutor aggregate diagnostics: total_rng_refills=" << m_diagnostics->totalRefillCount.load()
-                << ", summed_rng_mutex_wait_ms=" << m_diagnostics->summedMutexWaitNanoseconds.load() / 1.e6
-                << ", maximum_chunk_rng_mutex_wait_ms=" << m_diagnostics->maximumChunkMutexWaitNanoseconds.load() / 1.e6
-                << ", summed_rng_refill_generation_ms=" << m_diagnostics->summedRefillNanoseconds.load() / 1.e6
-                << ", maximum_chunk_rng_refill_generation_ms=" << m_diagnostics->maximumChunkRefillNanoseconds.load() / 1.e6
-                << ", tracing_wall_ms=" << m_diagnostics->wallNanoseconds() / 1.e6
-                << ", distinct_worker_threads=" << m_diagnostics->distinctWorkerThreadCount()
-                << ", maximum_active_workers=" << m_diagnostics->maximumActiveWorkers.load();
-            m_diagnostics.reset();
         }
         execution->started = false;
         execution->owner = nullptr;

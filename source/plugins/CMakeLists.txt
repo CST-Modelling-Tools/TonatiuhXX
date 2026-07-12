@@ -32,7 +32,6 @@ add_subdirectory(air)
 # add_subdirectory(component)
 add_subdirectory(material)
 add_subdirectory(photons)
-add_subdirectory(random)
 add_subdirectory(shape)
 add_subdirectory(sun)
 # add_subdirectory(trackers)
@@ -44,7 +43,6 @@ add_subdirectory(sun)
 #   libAirMirval.so              -> target AirMirval
 #   libMaterialSpecular.so       -> target MaterialSpecular
 #   libPhotonsFile.so            -> target PhotonsFile
-#   libRandomMersenneTwister.so  -> target RandomMersenneTwister
 #   libShapeElliptic.so          -> target ShapeElliptic
 #   libShapeFunctionXYZ.so       -> target ShapeFunctionXYZ
 #   libShapeFunctionZ.so         -> target ShapeFunctionZ
@@ -61,7 +59,6 @@ set(TONATIUHPP_PLUGIN_TARGETS
     AirMirval
     MaterialSpecular
     PhotonsFile
-    RandomMersenneTwister
     ShapeElliptic
     ShapeFunctionXYZ
     ShapeFunctionZ

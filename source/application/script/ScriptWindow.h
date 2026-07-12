@@ -8,7 +8,6 @@ class QItemSelectionModel;
 class QLineEdit;
 class QScriptContext;
 class QJSEngine;
-class RandomFactory;
 class MainWindow;
 class SyntaxHighlighter;
 

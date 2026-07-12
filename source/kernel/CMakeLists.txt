@@ -41,8 +41,7 @@ set(HEADERS
     profiles/ProfileRegular.h
     profiles/ProfileTriangle.h
     random/Random.h
-    random/RandomParallel.h
-    random/RandomSTL.h
+    random/StandardRandom.h
     run/InstanceNode.h
     run/RayTracer.h
     scene/GridNode.h
@@ -113,8 +112,7 @@ set(SOURCES
     profiles/ProfileRectangular.cpp
     profiles/ProfileRegular.cpp
     profiles/ProfileTriangle.cpp
-    random/RandomParallel.cpp
-    random/RandomSTL.cpp
+    random/StandardRandom.cpp
     run/InstanceNode.cpp
     run/RayTracer.cpp
     scene/GridNode.cpp

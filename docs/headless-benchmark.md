@@ -144,9 +144,9 @@ Use the dataset scene, config, reference JSON, and flux-grid reference files whe
 
 ## Scheduling
 
-GUI and headless tracing use the same `RayTraceExecutor`: 100 `raysPerThread` partitions plus one remainder partition when needed, one shared random stream behind `RandomParallel`, and the QtConcurrent global thread pool. Benchmark configuration fields `worker_count` and `chunk_size` are no longer supported and are rejected with a compatibility error because they cannot control this historical GUI execution model.
+GUI and headless tracing use the same `RayTraceExecutor`: stable 10,000-ray chunks, one deterministic `std::mt19937_64` stream derived from the master seed and chunk index for each chunk, and the QtConcurrent global thread pool. Benchmark configuration fields `worker_count` and `chunk_size` are not supported; the fixed chunk size is part of the deterministic tracing contract.
 
-The headless trace path now intentionally follows GUI scheduling rather than the previous deterministic per-chunk seed strategy. Whole-run timing and `flux_grid_sha256` should be treated as validation artifacts for a specific executable and platform, not as a guarantee across different scheduling environments.
+Random streams are reproducible across conforming standard libraries because seed derivation uses fixed-width unsigned arithmetic and uniform doubles use an explicit high-53-bit mapping rather than `std::uniform_real_distribution`. Final scientific outputs can still differ across platforms because the surrounding floating-point physics is not guaranteed to be bit-identical. Changing the fixed chunk size changes stream decomposition and therefore exact ray histories and hashes.
 
 ## Result Fields
 

@@ -22,7 +22,6 @@
 #include "kernel/profiles/ProfileRectangular.h"
 #include "kernel/profiles/ProfileRegular.h"
 #include "kernel/profiles/ProfileTriangle.h"
-#include "kernel/random/RandomSTL.h"
 #include "kernel/scene/TSceneKit.h"
 #include "kernel/scene/TSeparatorKit.h"
 #include "kernel/scene/TShapeKit.h"
@@ -86,8 +85,6 @@ void PluginManager::load(QDir dir)
     loadPlugin(new MaterialFactoryT<MaterialTransparent>);
     loadPlugin(new MaterialFactoryT<MaterialFresnelUnpolarized>);
     loadPlugin(new MaterialFactoryT<MaterialRough>);
-
-    loadPlugin(new RandomFactoryT<RandomSTL>);
 
     loadPlugin(new TrackerFactoryT<TrackerArmature1A>);
     loadPlugin(new TrackerFactoryT<TrackerArmature2A>);
@@ -173,11 +170,6 @@ void PluginManager::loadPlugin(TFactory* p)
         f->init();
         m_profileFactories << f;
         m_profileMap[f->name()] = f;
-    }
-    else if (auto f = dynamic_cast<RandomFactory*>(p))
-    {
-        m_randomFactories << f;
-        m_randomMap[f->name()] = f;
     }
     else if (auto f = dynamic_cast<ShapeFactory*>(p))
     {
@@ -266,9 +258,4 @@ void PluginManager::sort()
     };
     sortFactories(exportNames, m_exportFactories);
 
-    QStringList randomNames = {
-//        "Mersenne-Twister(STL)",
-        "Mersenne-Twister"
-    };
-    sortFactories(randomNames, m_randomFactories);
 }

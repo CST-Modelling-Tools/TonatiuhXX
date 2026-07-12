@@ -1,9 +1,6 @@
 #pragma once
 
 #include <QDialog>
-#include <QVector>
-
-class RandomFactory;
 class SceneTreeModel;
 class PhotonsFactory;
 struct PhotonsSettings;
@@ -23,13 +20,11 @@ public:
 
     void setParameters(
         int raysNumber, int raysScreen,
-        QVector<RandomFactory*> randomFactories, int raysRandomFactory = 0,
         int raysGridWidth = 200, int raysGridHeight = 200,
         int photonBufferSize = 1'000'000, bool photonBufferAppend = false);
 
     int raysNumber() const;
     int raysScreen() const;
-    int raysRandomFactory() const;
     int raysGridWidth() const;
     int raysGridHeight() const;
 

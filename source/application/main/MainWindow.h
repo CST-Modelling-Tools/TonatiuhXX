@@ -129,7 +129,6 @@ public slots:
     void AddExportSurfaceURL(QString nodeURL);
     void SetRaysNumber(uint rays) {m_raysNumber = rays;}
     void SetRaysScreen(uint rays) {m_raysScreen = rays;}
-    void SetRaysRandomFactory(QString name);
     void SetRaysGrid(int width, int height);
     void SetPhotonBufferSize(uint size);
     void SetPhotonBufferAppend(bool on);
@@ -262,12 +261,10 @@ private:
 
     ulong m_raysNumber;
     ulong m_raysScreen;
-    int m_raysRandomFactoryIndex;
     int m_raysGridWidth;
     int m_raysGridHeight;
 
     ulong m_raysTracedTotal;
-    Random* m_rand;
 
     PhotonsBuffer* m_photonsBuffer;
     ulong m_photonBufferSize;

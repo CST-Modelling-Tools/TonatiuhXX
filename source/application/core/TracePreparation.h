@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <cstdint>
 #include <memory>
 
 #include <QVector>
@@ -11,7 +12,6 @@
 class AirTransmission;
 class InstanceNode;
 class PhotonsBuffer;
-class Random;
 class SunAperture;
 class SunPosition;
 class SunShape;
@@ -27,7 +27,7 @@ struct GuiTracePreparationInput
     TSceneKit* scene = nullptr;
     InstanceNode* layoutRoot = nullptr;
     InstanceNode* sunInstance = nullptr;
-    Random* random = nullptr;
+    std::uint64_t masterSeed = 0;
     PhotonsBuffer* photonBuffer = nullptr;
     QVector<InstanceNode*> exportSurfaceList;
     PreparedTraceHitCallback hitCallback;
@@ -45,7 +45,7 @@ struct HeadlessTracePreparationInput
     PreparedTraceHitCallback hitCallback;
     TracePreparationProgress progress;
     ulong rays = 0;
-    ulong seed = 0;
+    std::uint64_t seed = 0;
     int sunWidthDivisions = 200;
     int sunHeightDivisions = 200;
 };
@@ -70,7 +70,6 @@ private:
     TSceneKit* m_scene = nullptr;
     SceneInstanceTree m_ownedInstanceTree;
     std::unique_ptr<InstanceNode> m_ownedSunInstance;
-    std::unique_ptr<Random> m_ownedRandom;
 
     InstanceNode* m_layoutRoot = nullptr;
     InstanceNode* m_sunInstance = nullptr;
@@ -78,7 +77,7 @@ private:
     SunAperture* m_sunAperture = nullptr;
     SunShape* m_sunShape = nullptr;
     AirTransmission* m_tracingAir = nullptr;
-    Random* m_random = nullptr;
+    std::uint64_t m_masterSeed = 0;
     PhotonsBuffer* m_photonBuffer = nullptr;
     QVector<InstanceNode*> m_exportSurfaceList;
     PreparedTraceHitCallback m_hitCallback;

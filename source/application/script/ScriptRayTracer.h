@@ -9,8 +9,6 @@
 class Document;
 class GraphicRoot;
 class InstanceNode;
-class Random;
-class RandomFactory;
 class QScriptContext;
 class SceneTreeModel;
 class PhotonsBuffer;
@@ -22,14 +20,13 @@ class ScriptRayTracer: public QObject
     Q_OBJECT
 
 public:
-    ScriptRayTracer(QVector<RandomFactory*> randomFactories);
+    ScriptRayTracer();
     ~ScriptRayTracer();
 
     void Clear();
 
     QString getDir() {return m_dirName;}
 
-    bool IsValidRandomGeneratorType(QString type);
     bool IsValidSurface(QString surfaceName);
 
     double GetArea() {return m_area;}
@@ -46,7 +43,6 @@ public:
 
     int SetPhotonMapExportMode(QString typeName);
 
-    int SetRandomDeviateType(QString typeName);
 
     void SetSunAzimtuh(double azimuth);
     void SetSunElevation(double elevation);
@@ -69,9 +65,6 @@ private:
 
     PhotonsBuffer* m_photonMap;
     bool m_photonMapToFile;
-
-    QVector<RandomFactory*> m_randomFactories;
-    Random* m_random;
 
     SceneTreeModel* m_sceneModel;
 

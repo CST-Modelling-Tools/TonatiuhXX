@@ -134,7 +134,7 @@ ScriptWindow::ScriptWindow(MainWindow* mw, QWidget* parent):
     QJSValue consoleObject = m_engine->newQObject(ui->logWidget);
     m_engine->globalObject().setProperty("console", consoleObject);
 
-    QObject* rayTracer = new ScriptRayTracer(mw->getPlugins()->getRandomFactories());
+    QObject* rayTracer = new ScriptRayTracer;
     QJSValue rayTracerObject = m_engine->newQObject(rayTracer);
     m_engine->globalObject().setProperty("rayTracer", rayTracerObject);
 

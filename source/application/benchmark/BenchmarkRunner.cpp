@@ -218,7 +218,7 @@ bool parseConfig(const QString& configFileName, BenchmarkConfig* config, QString
     if (object.contains("worker_count"))
         return fail(errorMessage, "worker_count is no longer supported; ray tracing uses the canonical GUI global Qt thread pool.");
     if (object.contains("chunk_size"))
-        return fail(errorMessage, "chunk_size is no longer supported; ray tracing uses the canonical GUI 100-partition decomposition.");
+        return fail(errorMessage, "chunk_size is no longer supported; ray tracing uses fixed 10,000-ray chunks.");
     if (object.contains("target_side_id")) {
         if (!object.value("target_side_id").isDouble())
             return fail(errorMessage, "target_side_id must be 0 or 1.");
@@ -465,11 +465,6 @@ public:
         ++m_totalHits;
     }
 
-    void onHitMinimal()
-    {
-        ++m_totalHits;
-    }
-
     void merge(const BenchmarkAccumulator& other)
     {
         for (size_t index = 0; index < m_hits.size(); ++index)
@@ -535,16 +530,14 @@ private:
 
 struct BenchmarkHitState
 {
-    explicit BenchmarkHitState(std::vector<BenchmarkAccumulator>* accumulators, bool minimalCollection):
+    explicit BenchmarkHitState(std::vector<BenchmarkAccumulator>* accumulators):
         accumulators(accumulators),
-        generation(nextBenchmarkRunGeneration.fetch_add(1)),
-        minimalCollection(minimalCollection)
+        generation(nextBenchmarkRunGeneration.fetch_add(1))
     {
     }
 
     std::vector<BenchmarkAccumulator>* accumulators = nullptr;
     const quint64 generation;
-    const bool minimalCollection;
     std::atomic<int> nextAccumulator{0};
 };
 
@@ -565,8 +558,7 @@ public:
 
     void operator()(const RayTracerHit& hit) const
     {
-        // Direct QtConcurrent::map(raysPerThread, RayTracer(...)) provides no
-        // task index, so benchmark hits are accumulated per worker thread.
+        // Hits are accumulated per worker thread and merged after tracing.
         if (!m_state || !m_state->accumulators || m_state->accumulators->empty())
             return;
 
@@ -582,10 +574,7 @@ public:
             return;
 
         BenchmarkAccumulator& accumulator = (*m_state->accumulators)[static_cast<size_t>(cache.accumulatorIndex)];
-        if (m_state->minimalCollection)
-            accumulator.onHitMinimal();
-        else
-            accumulator.onHit(hit);
+        accumulator.onHit(hit);
     }
 
 private:
@@ -832,19 +821,9 @@ int BenchmarkRunner::run(const QString& configFileName, TSceneKit* scene, QStrin
     RayTraceExecutorResult traceResult;
     RayTraceExecutor executor;
     QString traceError;
-    const int diagnosticMode = qEnvironmentVariableIntValue("TONATIUHPP_TRACE_THREAD_DIAGNOSTICS");
-    const bool minimalCollection = diagnosticMode == 2;
-    const bool nullCollection = diagnosticMode >= 3;
-    if (minimalCollection)
-        qInfo() << "Benchmark diagnostics: minimal thread-local hit collection enabled; benchmark results are diagnostic-only.";
-    else if (nullCollection)
-        qInfo() << "Benchmark diagnostics: hit collection bypassed; benchmark results are diagnostic-only.";
-
-    const std::shared_ptr<BenchmarkHitState> hitState = std::make_shared<BenchmarkHitState>(&threadAccumulators, minimalCollection);
+    const std::shared_ptr<BenchmarkHitState> hitState = std::make_shared<BenchmarkHitState>(&threadAccumulators);
     const BenchmarkHitCallback hitCallback(hitState);
-    const RayTraceExecutor::HitCallback traceHitCallback = nullCollection
-        ? RayTraceExecutor::HitCallback()
-        : RayTraceExecutor::HitCallback(hitCallback);
+    const RayTraceExecutor::HitCallback traceHitCallback(hitCallback);
     QElapsedTimer traceTimer;
     traceTimer.start();
     TextProgressReporter progress(&out);

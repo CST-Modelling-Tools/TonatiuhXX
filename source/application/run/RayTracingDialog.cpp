@@ -7,7 +7,6 @@
 #include "kernel/photons/PhotonsWidget.h"
 #include "kernel/photons/PhotonsSettings.h"
 #include "SelectSurfaceDialog.h"
-#include "kernel/random/Random.h"
 
 /*!
  * Creates a new dialog object to define the export settings. The available export mode types are listed into \a typeList.
@@ -28,13 +27,10 @@ RayTracingDialog::~RayTracingDialog()
     delete ui;
 }
 
-void RayTracingDialog::setParameters(int raysNumber, int raysScreen, QVector<RandomFactory*> randomFactories, int raysRandomFactory, int raysGridWidth, int raysGridHeight, int photonBufferSize, bool photonBufferAppend)
+void RayTracingDialog::setParameters(int raysNumber, int raysScreen, int raysGridWidth, int raysGridHeight, int photonBufferSize, bool photonBufferAppend)
 {
     ui->raysNumberSpin->setValue(raysNumber);
     ui->raysScreenSpin->setValue(raysScreen);
-    for (RandomFactory* f : randomFactories)
-        ui->raysRandomFactoryCombo->addItem(f->icon(), f->name());
-    ui->raysRandomFactoryCombo->setCurrentIndex(raysRandomFactory);
     ui->raysPlaneWidthSpin->setValue(raysGridWidth);
     ui->raysPlaneHeightSpin->setValue(raysGridHeight);
 
@@ -44,7 +40,6 @@ void RayTracingDialog::setParameters(int raysNumber, int raysScreen, QVector<Ran
 
 int RayTracingDialog::raysNumber() const {return ui->raysNumberSpin->value();}
 int RayTracingDialog::raysScreen() const {return ui->raysScreenSpin->value();}
-int RayTracingDialog::raysRandomFactory() const {return ui->raysRandomFactoryCombo->currentIndex();}
 int RayTracingDialog::raysGridWidth() const {return ui->raysPlaneWidthSpin->value();}
 int RayTracingDialog::raysGridHeight() const {return ui->raysPlaneHeightSpin->value();}
 

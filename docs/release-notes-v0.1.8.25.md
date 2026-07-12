@@ -9,7 +9,7 @@ These notes remain an RC draft until the release workflow is validated and Windo
 - Adds the first minimal true-headless script runner: `tonatiuhpp --headless run-script <script.tnhpps>`.
 - Runs headless scripts through a `QCoreApplication` and `QJSEngine` host without `QApplication`, `SoQt::init`, `MainWindow`, `ScriptWindow`, `NodeObject`, or GUI widgets.
 - Exposes a deliberately small first automation API: `print(value)`, `tn.writeJson(path, value)`, `tn.validateScene(path)`, `tn.runBenchmark(path)`, and no-export `tn.traceScene(options)`.
-- Uses one QCoreApplication-compatible `RayTraceExecutor` for GUI `MainWindow::Run()`, headless `trace-scene`, benchmark tracing, and `tn.traceScene(options)`, preserving the historical GUI QtConcurrent/shared-RNG execution model.
+- Uses one QCoreApplication-compatible `RayTraceExecutor` for GUI `MainWindow::Run()`, headless `trace-scene`, benchmark tracing, and `tn.traceScene(options)`, with one deterministic private `std::mt19937_64` stream per stable 10,000-ray chunk.
 - Keeps legacy `tonatiuhpp -i script.tnhpps` behavior unchanged and GUI-bound for compatibility.
 - Keeps `tonatiuhpp --headless -i script.tnhpps` unsupported; true non-GUI script automation uses the explicit `run-script` command.
 - Adds CTest smoke coverage for missing script arguments, rejection of GUI-only script API calls, `tn.traceScene` validation failures, and a small cylinder-scene script that validates a scene, runs no-export tracing, writes JSON, and runs a benchmark.

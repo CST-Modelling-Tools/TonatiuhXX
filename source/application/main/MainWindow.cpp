@@ -72,7 +72,6 @@
 #include "kernel/photons/PhotonsBuffer.h"
 #include "kernel/photons/PhotonsAbstract.h"
 #include "kernel/photons/PhotonsSettings.h"
-#include "kernel/random/Random.h"
 #include "kernel/run/InstanceNode.h"
 #include "kernel/profiles/ProfileRT.h"
 #include "kernel/scene/TSceneKit.h"
@@ -106,6 +105,11 @@
 #include "updater/UpdateDialog.h"
 
 namespace {
+std::uint64_t resolvedGuiMasterSeed()
+{
+    return static_cast<std::uint64_t>(QTime::currentTime().msec());
+}
+
 QString appBundleDataPath(const QString& relativePath)
 {
     QDir dir(QCoreApplication::applicationDirPath());
@@ -248,12 +252,10 @@ MainWindow::MainWindow(QString fileName, CustomSplashScreen* splash, QWidget* pa
 
     m_raysNumber(10'000),
     m_raysScreen(1'000),
-    m_raysRandomFactoryIndex(0),
     m_raysGridWidth(200),
     m_raysGridHeight(200),
 
     m_raysTracedTotal(0),
-    m_rand(0),
 
     m_photonsBuffer(0),
     m_photonBufferSize(1'000'000),
@@ -321,7 +323,6 @@ MainWindow::~MainWindow()
     delete m_pluginManager;
     delete m_modelScene;
     delete m_document;
-    delete m_rand;
     delete m_photonsBuffer;
 }
 
@@ -606,14 +607,6 @@ void MainWindow::FinishManipulation()
     setDocumentModified(true);
 }
 
-//void MainWindow::ExecuteScriptFile(QString fileName)
-//{
-//    ScriptEditorDialog dialog(m_pluginManager->getRandomFactories(), this);
-//    dialog.show();
-//    dialog.ExecuteScript(fileName);
-//    dialog.done(0);
-//}
-
 void MainWindow::onAbort(QString error)
 {
     showInStatusBar(error);
@@ -845,11 +838,8 @@ void MainWindow::RunCompleteRayTracer()
 
 
     QVector<PhotonsFactory*> exportFactories = m_pluginManager->getExportFactories();
-    QVector<RandomFactory*> randomFactories = m_pluginManager->getRandomFactories();
-
     RayTracingDialog dialog;
     dialog.setParameters(m_raysNumber, m_raysScreen,
-                         randomFactories, m_raysRandomFactoryIndex,
                          m_raysGridWidth, m_raysGridHeight,
                          m_photonBufferSize, m_photonBufferAppend);
     dialog.setPhotonSettings(m_modelScene, exportFactories, m_photonsSettings);
@@ -865,7 +855,6 @@ void MainWindow::RunCompleteRayTracer()
 
     SetRaysNumber(dialog.raysNumber());
     SetRaysScreen(dialog.raysScreen());
-    SetRaysRandomFactory(randomFactories[dialog.raysRandomFactory()]->name());
     SetRaysGrid(dialog.raysGridWidth(), dialog.raysGridHeight());
     m_photonBufferSize = photonBufferSize;
     m_photonBufferAppend = photonBufferAppend;
@@ -885,9 +874,7 @@ void MainWindow::RunFluxAnalysisDialog()
     TSceneKit* sceneKit = m_document->getSceneKit();
     if (!sceneKit) return;
 
-    Random* rand = m_pluginManager->getRandomFactories()[m_raysRandomFactoryIndex]->create(0);
-
-    FluxAnalysisDialog dialog(sceneKit, m_modelScene, m_raysGridWidth, m_raysGridHeight, rand, this);
+    FluxAnalysisDialog dialog(sceneKit, m_modelScene, m_raysGridWidth, m_raysGridHeight, resolvedGuiMasterSeed(), this);
     dialog.exec();
 }
 
@@ -1745,10 +1732,7 @@ QJSValue MainWindow::FindInterception(QJSValue surface, QJSValue rays, QJSValue 
 //    double ans = findInterception(surface.toString(), rays.toUInt(), this);
 //    return ans;
 
-    if (!m_rand)
-        m_rand = m_pluginManager->getRandomFactories()[m_raysRandomFactoryIndex]->create(0);
-
-    FluxAnalysis fa(m_document->getSceneKit(), m_modelScene, m_raysGridWidth, m_raysGridHeight, m_rand);
+    FluxAnalysis fa(m_document->getSceneKit(), m_modelScene, m_raysGridWidth, m_raysGridHeight, resolvedGuiMasterSeed());
     fa.run(surface.toString(), "front", rays.toUInt(), false, 5, 5, true);
     double ans = fa.powerTotal();
 
@@ -2012,7 +1996,7 @@ void MainWindow::Run()
     preparationInput.scene = m_document->getSceneKit();
     preparationInput.layoutRoot = instanceLayout;
     preparationInput.sunInstance = &instanceSun;
-    preparationInput.random = m_rand;
+    preparationInput.masterSeed = resolvedGuiMasterSeed();
     preparationInput.photonBuffer = m_photonsBuffer;
     preparationInput.exportSurfaceList = exportSurfaceList;
     preparationInput.tracingAir = airTemp;
@@ -2081,10 +2065,7 @@ void MainWindow::RunFluxAnalysis(QString nodeURL, QString surfaceSide, uint nOfR
     TSceneKit* sceneKit = m_document->getSceneKit();
     if (!sceneKit) return;
 
-    if (!m_rand)
-        m_rand = m_pluginManager->getRandomFactories()[m_raysRandomFactoryIndex]->create(0);
-
-    FluxAnalysis fa(sceneKit, m_modelScene, m_raysGridWidth, m_raysGridHeight, m_rand);
+    FluxAnalysis fa(sceneKit, m_modelScene, m_raysGridWidth, m_raysGridHeight, resolvedGuiMasterSeed());
     fa.run(nodeURL, surfaceSide, nOfRays, false, heightDivisions, widthDivisions); //?
     fa.write(fileName, saveCoords);
 }
@@ -2235,36 +2216,6 @@ void MainWindow::SetPhotonBufferAppend(bool on)
     if (!ResetPhotonExporter())
         return;
     m_photonBufferAppend = on;
-}
-
-/*!
- * Sets the random number generator type, \a typeName, for ray tracing.
- */
-void MainWindow::SetRaysRandomFactory(QString name)
-{
-//    RandomFactory* f = m_pluginManager->getRandomMap().value(name, 0);
-//    if (!f) return;
-
-    QVector<RandomFactory*> factories = m_pluginManager->getRandomFactories();
-    if (factories.size() == 0) return;
-
-    QVector< QString > randomNames;
-    for (int i = 0; i < factories.size(); i++)
-        randomNames << factories[i]->name();
-
-    int oldSelectedRandomDeviate = m_raysRandomFactoryIndex;
-
-    if (randomNames.indexOf(name) < 0)
-    {
-        emit Abort(tr("SetRandomDeviateType: Defined random generator is not valid type.") );
-        return;
-    }
-    m_raysRandomFactoryIndex = randomNames.indexOf(name);
-    if (oldSelectedRandomDeviate != m_raysRandomFactoryIndex)
-    {
-        delete m_rand;
-        m_rand = 0;
-    }
 }
 
 /*!
@@ -2814,9 +2765,6 @@ bool MainWindow::ReadyForRaytracing(InstanceNode*& instanceLayout,
 
     air = (AirTransmission*) sceneKit->getPart("world.air.transmission", false);
 
-    QVector<RandomFactory*> randomFactories = m_pluginManager->getRandomFactories();
-    if (!m_rand) m_rand = randomFactories[m_raysRandomFactoryIndex]->create(0);
-
     if (!m_photonBufferAppend)
     {
         if (!ResetPhotonExporter())
@@ -3014,10 +2962,7 @@ void MainWindow::dropEvent(QDropEvent* event)
 
 double findInterception(QString surface, uint rays, MainWindow* mw)
 {
-    if (!mw->m_rand)
-        mw->m_rand = mw->m_pluginManager->getRandomFactories()[mw->m_raysRandomFactoryIndex]->create(0);
-
-    FluxAnalysis fa(mw->m_document->getSceneKit(), mw->m_modelScene, mw->m_raysGridWidth, mw->m_raysGridHeight, mw->m_rand);
+    FluxAnalysis fa(mw->m_document->getSceneKit(), mw->m_modelScene, mw->m_raysGridWidth, mw->m_raysGridHeight, resolvedGuiMasterSeed());
     fa.run(surface, "front", rays, false, 5, 5, true);
     return fa.powerTotal();
 }

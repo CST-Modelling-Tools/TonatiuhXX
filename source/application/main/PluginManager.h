@@ -13,7 +13,6 @@ class TrackerFactory;
 class ShapeFactory;
 class ProfileFactory;
 class MaterialFactory;
-class RandomFactory;
 class PhotonsFactory;
 class SoNode;
 
@@ -37,7 +36,6 @@ public:
     QVector<ShapeFactory*> getShapeFactories() const {return m_shapeFactories;}
     QVector<ProfileFactory*> getProfileFactories() const {return m_profileFactories;}
     QVector<MaterialFactory*> getMaterialFactories() const {return m_materialFactories;}
-    QVector<RandomFactory*> getRandomFactories() const {return m_randomFactories;}
     QVector<PhotonsFactory*> getExportFactories() const {return m_exportFactories;}
 
     const QMap<QString, SunFactory*>& getSunMap() const {return m_sunMap;}
@@ -46,7 +44,6 @@ public:
     const QMap<QString, ShapeFactory*>& getShapeMap() const {return m_shapeMap;}
     const QMap<QString, ProfileFactory*>& getProfileMap() const {return m_profileMap;}
     const QMap<QString, MaterialFactory*>& getMaterialMap() const {return m_materialMap;}
-    const QMap<QString, RandomFactory*>& getRandomMap() const {return m_randomMap;}
     const QMap<QString, PhotonsFactory*>& getExportMap() const {return m_exportMap;}
 
     QVector<TFactory*> getFactories(SoNode* node);
@@ -63,7 +60,6 @@ private:
     QVector<ShapeFactory*> m_shapeFactories;
     QVector<ProfileFactory*> m_profileFactories;
     QVector<MaterialFactory*> m_materialFactories;
-    QVector<RandomFactory*> m_randomFactories;
     QVector<PhotonsFactory*> m_exportFactories;
 
     QMap<QString, SunFactory*> m_sunMap;
@@ -72,7 +68,6 @@ private:
     QMap<QString, ShapeFactory*> m_shapeMap;
     QMap<QString, ProfileFactory*> m_profileMap;
     QMap<QString, MaterialFactory*> m_materialMap;
-    QMap<QString, RandomFactory*> m_randomMap;
     QMap<QString, PhotonsFactory*> m_exportMap;
 };
 

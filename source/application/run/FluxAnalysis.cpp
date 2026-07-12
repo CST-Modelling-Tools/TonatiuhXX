@@ -18,7 +18,6 @@
 #include "kernel/air/AirTransmission.h"
 #include "kernel/run/InstanceNode.h"
 #include "kernel/photons/PhotonsBuffer.h"
-#include "kernel/random//Random.h"
 #include "kernel/scene/TSceneKit.h"
 #include "kernel/scene/TShapeKit.h"
 #include "kernel/shape/ShapeRT.h"
@@ -36,13 +35,13 @@ FluxAnalysis::FluxAnalysis(TSceneKit* sceneKit,
     SceneTreeModel* sceneModel,
     int sunWidthDivisions,
     int sunHeightDivisions,
-    Random* randomDeviate
+    std::uint64_t masterSeed
 ):
     QObject(0),
     m_sceneKit(sceneKit),
     m_sceneModel(sceneModel),
     m_sunDivs(sunWidthDivisions, sunHeightDivisions),
-    m_rand(randomDeviate),
+    m_masterSeed(masterSeed),
     m_photons(0),
     m_surfaceURL(""),
     m_tracedRays(0),
@@ -105,8 +104,6 @@ void FluxAnalysis::run(QString nodeURL, QString surfaceSide, ulong nRays, bool p
     SunPosition* sunPosition = (SunPosition*) sunKit->getPart("position", false);
     SunAperture* sunAperture = (SunAperture*) sunKit->getPart("aperture", false);
 
-    if (!m_rand) return;
-
     //Check if the surface and the surface side defined is suitable
 //    QString shapeType = getShapeType(m_surfaceURL);
 //    QStringList list = {"Planar", "Cylinder"};
@@ -158,7 +155,7 @@ void FluxAnalysis::run(QString nodeURL, QString surfaceSide, ulong nRays, bool p
     preparationInput.scene = m_sceneKit;
     preparationInput.layoutRoot = m_instanceLayout;
     preparationInput.sunInstance = &instanceSun;
-    preparationInput.random = m_rand;
+    preparationInput.masterSeed = m_masterSeed++;
     preparationInput.photonBuffer = m_photons;
     preparationInput.exportSurfaceList = exportSuraceList;
     preparationInput.tracingAir = airTemp;

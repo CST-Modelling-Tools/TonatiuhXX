@@ -34,7 +34,7 @@
 
 FluxAnalysisDialog::FluxAnalysisDialog(TSceneKit* sceneKit, SceneTreeModel* sceneModel,
                                        int sunWidthDivisions, int sunHeightDivisions,
-                                       Random* randomDeviate, QWidget* parent):
+                                       std::uint64_t masterSeed, QWidget* parent):
     QDialog(parent),
     ui(new Ui::FluxAnalysisDialog),
     m_sceneModel(sceneModel),
@@ -42,7 +42,7 @@ FluxAnalysisDialog::FluxAnalysisDialog(TSceneKit* sceneKit, SceneTreeModel* scen
 {
     ui->setupUi(this);
 
-    m_fluxAnalysis = new FluxAnalysis(sceneKit, sceneModel, sunWidthDivisions, sunHeightDivisions, randomDeviate);
+    m_fluxAnalysis = new FluxAnalysis(sceneKit, sceneModel, sunWidthDivisions, sunHeightDivisions, masterSeed);
 
     connect(ui->surfaceButton, SIGNAL(clicked()), this, SLOT(SurfaceSelected()));
     connect(ui->surfaceEdit, SIGNAL(editingFinished()), this, SLOT(SurfaceChanged()));

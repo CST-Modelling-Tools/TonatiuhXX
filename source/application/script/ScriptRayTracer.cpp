@@ -14,7 +14,6 @@
 #include "kernel/air/AirTransmission.h"
 #include "kernel/node/TonatiuhFunctions.h"
 #include "kernel/photons/PhotonsBuffer.h"
-#include "kernel/random/Random.h"
 #include "kernel/run/RayTracer.h"
 #include "kernel/scene/TSeparatorKit.h"
 #include "kernel/shape/ShapeRT.h"
@@ -27,13 +26,11 @@
 #include "view/GraphicRoot.h"
 
 
-ScriptRayTracer::ScriptRayTracer(QVector<RandomFactory*> randomFactories):
+ScriptRayTracer::ScriptRayTracer():
     m_document(0),
     m_irradiance(-1),
     m_numberOfRays(0),
     m_photonMap(0),
-    m_randomFactories(randomFactories),
-    m_random(0),
     m_sceneModel(0),
     m_widthDivisions(200),
     m_heightDivisions(200),
@@ -50,7 +47,6 @@ ScriptRayTracer::~ScriptRayTracer()
 {
     delete m_document;
     delete m_photonMap;
-    delete m_random;
     delete m_sceneModel;
 }
 
@@ -62,29 +58,12 @@ void ScriptRayTracer::Clear()
     m_numberOfRays = 0;
     delete m_photonMap;
     m_photonMap = 0;
-    delete m_random;
-    m_random = 0;
     delete m_sceneModel;
     m_sceneModel = 0;
     m_sunAzimuth = 0;
     m_sunElevation = 0;
     m_wPhoton = 0;
     m_dirName.clear();
-}
-
-bool ScriptRayTracer::IsValidRandomGeneratorType(QString type)
-{
-    if (m_randomFactories.size() == 0) return 0;
-
-    QVector< QString > randomGeneratorsNames;
-    for (int i = 0; i < m_randomFactories.size(); i++)
-        randomGeneratorsNames << m_randomFactories[i]->name();
-
-    int selectedRandom = randomGeneratorsNames.indexOf(type);
-
-    if (selectedRandom < 0) return 0;
-
-    return 1;
 }
 
 bool ScriptRayTracer::IsValidSurface(QString surfaceName)
@@ -134,23 +113,6 @@ int ScriptRayTracer::SetPhotonMapExportMode(QString typeName)
     else if (typeName == QLatin1String("DB") ) m_photonMapToFile = false;
     else return 0;
 
-    return 1;
-}
-
-int ScriptRayTracer::SetRandomDeviateType(QString typeName)
-{
-    QVector< QString > randomGeneratorsNames;
-    for (int i = 0; i < m_randomFactories.size(); i++)
-        randomGeneratorsNames << m_randomFactories[i]->name();
-
-    int selectedRandom = randomGeneratorsNames.indexOf(typeName);
-    if (selectedRandom < 0)
-    {
-        m_random = 0;
-        return 0;
-    }
-
-    m_random = m_randomFactories[selectedRandom]->create(0);
     return 1;
 }
 

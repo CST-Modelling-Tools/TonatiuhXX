@@ -1,9 +1,6 @@
 #include <QPoint>
-#include <QElapsedTimer>
-#include <QThread>
-
 #include "shape/DifferentialGeometry.h"
-#include "random/RandomParallel.h"
+#include "random/Random.h"
 #include "libraries/math/3D/Ray.h"
 #include "RayTracer.h"
 #include "kernel/photons/PhotonsBuffer.h"
@@ -11,74 +8,17 @@
 #include "sun/SunShape.h"
 #include "air/AirTransmission.h"
 
-namespace
-{
-void updateMaximum(std::atomic<qint64>& maximum, qint64 value)
-{
-    qint64 current = maximum.load();
-    while (current < value && !maximum.compare_exchange_weak(current, value)) {
-    }
-}
-
-void updateMaximum(std::atomic<int>& maximum, int value)
-{
-    int current = maximum.load();
-    while (current < value && !maximum.compare_exchange_weak(current, value)) {
-    }
-}
-}
-
-void RayTraceDiagnostics::start()
-{
-    m_wallTimer.start();
-}
-
-void RayTraceDiagnostics::workerStarted()
-{
-    const int active = activeWorkers.fetch_add(1) + 1;
-    updateMaximum(maximumActiveWorkers, active);
-    QMutexLocker locker(&m_workerThreadsMutex);
-    m_workerThreads.insert(reinterpret_cast<quintptr>(QThread::currentThreadId()));
-}
-
-void RayTraceDiagnostics::workerFinished()
-{
-    activeWorkers.fetch_sub(1);
-}
-
-void RayTraceDiagnostics::recordRandomStats(quint64 refillCount, qint64 mutexWaitNanoseconds, qint64 refillNanoseconds)
-{
-    totalRefillCount.fetch_add(refillCount);
-    summedMutexWaitNanoseconds.fetch_add(mutexWaitNanoseconds);
-    summedRefillNanoseconds.fetch_add(refillNanoseconds);
-    updateMaximum(maximumChunkMutexWaitNanoseconds, mutexWaitNanoseconds);
-    updateMaximum(maximumChunkRefillNanoseconds, refillNanoseconds);
-}
-
-int RayTraceDiagnostics::distinctWorkerThreadCount() const
-{
-    QMutexLocker locker(&m_workerThreadsMutex);
-    return m_workerThreads.size();
-}
-
-qint64 RayTraceDiagnostics::wallNanoseconds() const
-{
-    return m_wallTimer.isValid() ? m_wallTimer.nsecsElapsed() : 0;
-}
-
 RayTracer::RayTracer(InstanceNode* instanceRoot,
     InstanceNode* instanceSun,
     SunAperture* sunAperture,
     SunShape* sunShape,
     AirTransmission* air,
     Random* rand,
-    QMutex* mutexRand,
     PhotonsBuffer* photonBuffer,
     QMutex* mutexPhotons,
     QVector<InstanceNode*> exportSuraceList,
     std::atomic_bool* exportFailed,
-    HitCallback hitCallback,
-    RayTraceDiagnostics* diagnostics
+    HitCallback hitCallback
 ):
     m_instanceLayout(instanceRoot),
     m_instanceSun(instanceSun),
@@ -87,12 +27,10 @@ RayTracer::RayTracer(InstanceNode* instanceRoot,
     m_sunTransform(instanceSun->getTransform()),
     m_air(air),
     m_rand(rand),
-    m_mutexRand(mutexRand),
     m_photonBuffer(photonBuffer),
     m_mutexPhotonsBuffer(mutexPhotons),
     m_exportFailed(exportFailed),
     m_hitCallback(hitCallback),
-    m_diagnostics(diagnostics),
     m_exportSurfaceList(exportSuraceList),
     m_sunCells(sunAperture->getCells())
 {
@@ -105,18 +43,7 @@ void RayTracer::operator()(ulong nRays)
     if (m_exportFailed && m_exportFailed->load())
         return;
 
-    RandomParallel rand(m_rand, m_mutexRand, 100'000, m_diagnostics != nullptr);
-    struct RandomDiagnostic
-    {
-        RandomParallel* random;
-
-        ~RandomDiagnostic()
-        {
-            if (aggregate)
-                aggregate->recordRandomStats(random->refillCount(), random->mutexWaitNanoseconds(), random->refillNanoseconds());
-        }
-        RayTraceDiagnostics* aggregate;
-    } randomDiagnostic{&rand, m_diagnostics};
+    Random& rand = *m_rand;
     const bool recordPhotons = m_photonBuffer && m_mutexPhotonsBuffer;
     if (!recordPhotons) {
         for (ulong n = 0; n < nRays; ++n) {

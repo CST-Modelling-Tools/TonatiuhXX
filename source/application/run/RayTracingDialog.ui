@@ -59,13 +59,6 @@
             </property>
            </widget>
           </item>
-          <item row="2" column="0">
-           <widget class="QLabel" name="raysRandomFactoryLabel">
-            <property name="text">
-             <string>Random generator</string>
-            </property>
-           </widget>
-          </item>
           <item row="4" column="0">
            <widget class="QLabel" name="raysPlaneHeightLabel">
             <property name="text">
@@ -79,9 +72,6 @@
              <string>Screen rays</string>
             </property>
            </widget>
-          </item>
-          <item row="2" column="1">
-           <widget class="QComboBox" name="raysRandomFactoryCombo"/>
           </item>
           <item row="3" column="1">
            <widget class="QSpinBox" name="raysPlaneWidthSpin">

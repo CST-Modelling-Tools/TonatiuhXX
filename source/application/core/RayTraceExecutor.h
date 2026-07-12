@@ -20,7 +20,6 @@ class SunShape;
 class RayTraceExecutor;
 class PreparedTraceContext;
 struct RayTracerHit;
-struct RayTraceDiagnostics;
 struct RayTraceWorkerState;
 
 struct RayTraceExecutorResult
@@ -91,11 +90,9 @@ public:
     bool exportFailed() const { return m_exportFailed.load(); }
 
 private:
-    QMutex m_randomMutex;
     QMutex m_photonBufferMutex;
     std::atomic_bool m_active{false};
     std::atomic_bool m_exportFailed{false};
-    std::shared_ptr<RayTraceDiagnostics> m_diagnostics;
     std::shared_ptr<RayTraceWorkerState> m_workerState;
     std::shared_ptr<PreparedTraceContext> m_activeContext;
 };

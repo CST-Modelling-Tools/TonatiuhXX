@@ -193,25 +193,6 @@ int tonatiuh_script::init(QJSEngine* engine)
 //    return 1;
 //}
 
-//QJSValue tonatiuh_script::tonatiuh_random_generator(QScriptContext* context, QJSEngine* engine)
-//{
-//    if (context->argumentCount() != 1) return context->throwError("tonatiuh_random_generator: takes exactly one argument.");
-//    if (!context->argument(0).isString() ) return context->throwError("tonatiuh_random_generator: argument is not a string.");
-
-//    QJSValue rayTracerValue = engine->globalObject().property("rayTracer");
-//    ScriptRayTracer* rayTracer = ( ScriptRayTracer* ) rayTracerValue.toQObject();
-//    if (!rayTracer) return 0;
-
-//    QString randomDeviateType = context->argument(0).toString();
-//    if (!rayTracer->IsValidRandomGeneratorType(randomDeviateType) ) return context->throwError("tonatiuh_random_generator: defined random generator type is not valid.");
-//    rayTracer->SetRandomDeviateType(randomDeviateType);
-
-//    int result = rayTracer->SetRandomDeviateType(randomDeviateType);
-//    if (result == 0) return context->throwError("tonatiuh_random_generator: UnknownError.");
-
-//    return 1;
-//}
-
 //QJSValue tonatiuh_script::tonatiuh_sunposition(QScriptContext* context, QJSEngine* engine)
 //{
 //    //tonatiuh_sunposition( azimuth, elevation, distance );

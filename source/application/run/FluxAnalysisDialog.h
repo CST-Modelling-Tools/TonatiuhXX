@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QDialog>
+#include <cstdint>
 
 namespace Ui {
 class FluxAnalysisDialog;
@@ -14,7 +15,6 @@ class FluxAnalysisDialog;
 class InstanceNode;
 class SceneTreeModel;
 class QIntValidator;
-class Random;
 class TSceneKit;
 class FluxAnalysis;
 class QCPItemLine;
@@ -25,7 +25,7 @@ class FluxAnalysisDialog: public QDialog
 
 public:
     FluxAnalysisDialog(TSceneKit* sceneKit, SceneTreeModel* sceneModel, int sunWidthDivisions, int sunHeightDivisions,
-                       Random* randomDeviate, QWidget* parent = 0);
+                       std::uint64_t masterSeed, QWidget* parent = 0);
     ~FluxAnalysisDialog();
 
 private slots:

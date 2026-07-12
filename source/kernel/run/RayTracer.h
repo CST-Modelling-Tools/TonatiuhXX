@@ -6,8 +6,6 @@
 #include <vector>
 
 #include <QVector>
-#include <QElapsedTimer>
-#include <QMap>
 #include <QMutex>
 #include <QPair>
 #include <QSet>
@@ -17,7 +15,6 @@
 #include "libraries/math/3D/vec3d.h"
 
 class InstanceNode;
-class RandomParallel;
 struct Photon;
 class Random;
 struct RayTracerPhoton;
@@ -35,29 +32,6 @@ struct TONATIUH_KERNEL RayTracerHit
     bool isFront = false;
 };
 
-struct TONATIUH_KERNEL RayTraceDiagnostics
-{
-    void start();
-    void workerStarted();
-    void workerFinished();
-    void recordRandomStats(quint64 refillCount, qint64 mutexWaitNanoseconds, qint64 refillNanoseconds);
-    int distinctWorkerThreadCount() const;
-    qint64 wallNanoseconds() const;
-
-    std::atomic<quint64> totalRefillCount{0};
-    std::atomic<qint64> summedMutexWaitNanoseconds{0};
-    std::atomic<qint64> maximumChunkMutexWaitNanoseconds{0};
-    std::atomic<qint64> summedRefillNanoseconds{0};
-    std::atomic<qint64> maximumChunkRefillNanoseconds{0};
-    std::atomic<int> activeWorkers{0};
-    std::atomic<int> maximumActiveWorkers{0};
-
-private:
-    mutable QMutex m_workerThreadsMutex;
-    QSet<quintptr> m_workerThreads;
-    QElapsedTimer m_wallTimer;
-};
-
 class TONATIUH_KERNEL RayTracer
 {
 
@@ -70,13 +44,11 @@ public:
               SunShape* sunShape,
               AirTransmission* air,
               Random* rand,
-              QMutex* mutexRand,
               PhotonsBuffer* photonBuffer,
               QMutex* mutexPhotons,
               QVector<InstanceNode*> exportSuraceList,
               std::atomic_bool* exportFailed = nullptr,
-              HitCallback hitCallback = HitCallback(),
-              RayTraceDiagnostics* diagnostics = nullptr);
+              HitCallback hitCallback = HitCallback());
 
     typedef void result_type;
 
@@ -92,12 +64,10 @@ private:
     Transform m_sunTransform;
     AirTransmission* m_air;
     Random* m_rand;
-    QMutex* m_mutexRand;
     PhotonsBuffer* m_photonBuffer;
     QMutex* m_mutexPhotonsBuffer;
     std::atomic_bool* m_exportFailed;
     HitCallback m_hitCallback;
-    RayTraceDiagnostics* m_diagnostics;
     QVector<InstanceNode*> m_exportSurfaceList;
 
     const std::vector< QPair<int, int> >&  m_sunCells;

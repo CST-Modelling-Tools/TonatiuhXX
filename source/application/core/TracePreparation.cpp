@@ -8,7 +8,6 @@
 #include "kernel/air/AirTransmission.h"
 #include "kernel/air/AirVacuum.h"
 #include "kernel/photons/PhotonsBuffer.h"
-#include "kernel/random/RandomSTL.h"
 #include "kernel/run/InstanceNode.h"
 #include "kernel/scene/TSceneKit.h"
 #include "kernel/sun/SunAperture.h"
@@ -102,8 +101,8 @@ bool TracePreparation::prepareGuiTrace(const GuiTracePreparationInput& input,
         return fail(errorMessage, "Prepared trace context is null.");
     if (!validateCommon(input.rays, input.sunWidthDivisions, input.sunHeightDivisions, errorMessage))
         return false;
-    if (!input.layoutRoot || !input.sunInstance || !input.random)
-        return fail(errorMessage, "GUI trace preparation is missing its layout, sun instance, or random generator.");
+    if (!input.layoutRoot || !input.sunInstance)
+        return fail(errorMessage, "GUI trace preparation is missing its layout or sun instance.");
 
     SunKit* sunKit = nullptr;
     SunShape* sunShape = nullptr;
@@ -131,7 +130,7 @@ bool TracePreparation::prepareGuiTrace(const GuiTracePreparationInput& input,
     prepared.m_sunAperture = sunAperture;
     prepared.m_sunShape = sunShape;
     prepared.m_tracingAir = input.tracingAir;
-    prepared.m_random = input.random;
+    prepared.m_masterSeed = input.masterSeed;
     prepared.m_photonBuffer = input.photonBuffer;
     prepared.m_exportSurfaceList = input.exportSurfaceList;
     prepared.m_hitCallback = input.hitCallback;
@@ -188,14 +187,13 @@ bool TracePreparation::prepareHeadlessTrace(const HeadlessTracePreparationInput&
     prepared.m_scene = input.scene;
     prepared.m_ownedInstanceTree = std::move(instanceTree);
     prepared.m_ownedSunInstance = std::move(sunInstance);
-    prepared.m_ownedRandom = std::make_unique<RandomSTL>(input.seed);
     prepared.m_layoutRoot = prepared.m_ownedInstanceTree.layoutRoot;
     prepared.m_sunInstance = prepared.m_ownedSunInstance.get();
     prepared.m_sunPosition = sunPosition;
     prepared.m_sunAperture = sunAperture;
     prepared.m_sunShape = sunShape;
     prepared.m_tracingAir = tracingAir;
-    prepared.m_random = prepared.m_ownedRandom.get();
+    prepared.m_masterSeed = input.seed;
     prepared.m_hitCallback = input.hitCallback;
     prepared.m_rays = input.rays;
     *context = std::move(prepared);

@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QString>
+#include <cstdint>
 #include "libraries/math/2D/Matrix2D.h"
 #include "libraries/math/2D/Box2D.h"
 #include "libraries/math/2D/vec2i.h"
@@ -9,7 +10,6 @@
 class TSceneKit;
 class SceneTreeModel;
 class InstanceNode;
-class Random;
 class PhotonsBuffer;
 
 class FluxAnalysis: public QObject
@@ -17,7 +17,7 @@ class FluxAnalysis: public QObject
 Q_OBJECT
 
 public:
-    FluxAnalysis(TSceneKit* sceneKit, SceneTreeModel* sceneModel, int sunWidthDivisions, int sunHeightDivisions, Random* randomDeviate);
+    FluxAnalysis(TSceneKit* sceneKit, SceneTreeModel* sceneModel, int sunWidthDivisions, int sunHeightDivisions, std::uint64_t masterSeed);
     ~FluxAnalysis();
 
     QString getShapeType(QString nodeURL);
@@ -51,7 +51,7 @@ private:
     SceneTreeModel* m_sceneModel;
     InstanceNode* m_instanceLayout;
     vec2i m_sunDivs;
-    Random* m_rand;
+    std::uint64_t m_masterSeed;
 
     PhotonsBuffer* m_photons;
 
