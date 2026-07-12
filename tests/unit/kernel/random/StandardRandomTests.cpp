@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "source/kernel/random/StandardRandom.h"
+#include "kernel/random/StandardRandom.h"
 
 #include <array>
 #include <cstdint>
